@@ -1,0 +1,169 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+import { Plus, Pencil, Trash2, X } from "lucide-react";
+import { toast } from "sonner";
+import { AdminShell } from "@/components/admin-shell";
+import { ProductLogo } from "@/components/product-logo";
+import { getProducts, createProduct, updateProduct, deleteProduct } from "@/lib/api";
+import type { Product } from "@/lib/mock-data";
+
+export const Route = createFileRoute("/admin/products")({
+  head: () => ({ meta: [{ title: "Admin Products" }, { name: "robots", content: "noindex" }] }),
+  component: AdminProductsPage,
+});
+
+const empty: Product = {
+  id: "", name: "", category: "AI Assistants", price: 0, icon: "✨",
+  shortDescription: "", description: "", features: [], deliveryMethod: "",
+  terms: "", stock: 0,
+};
+
+function AdminProductsPage() {
+  const qc = useQueryClient();
+  const { data: products = [], isLoading } = useQuery({ queryKey: ["products"], queryFn: getProducts });
+  const [editing, setEditing] = useState<Product | null>(null);
+
+  return (
+    <AdminShell title="Products">
+      <div className="mb-4 flex justify-end">
+        <button
+          onClick={() => setEditing({ ...empty, id: `prod-${Date.now()}` })}
+          className="inline-flex items-center gap-2 rounded-xl bg-gradient-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-glow"
+        >
+          <Plus className="h-4 w-4" /> Add Product
+        </button>
+      </div>
+
+      {isLoading ? (
+        <div className="h-64 animate-pulse rounded-2xl bg-secondary/30" />
+      ) : products.length === 0 ? (
+        <div className="glass rounded-2xl py-16 text-center text-sm text-muted-foreground">No products. Add one to get started.</div>
+      ) : (
+        <div className="glass rounded-2xl overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="text-left text-xs uppercase text-muted-foreground">
+              <tr><th className="px-4 py-3">Product</th><th>Category</th><th>Price</th><th>Stock</th><th></th></tr>
+            </thead>
+            <tbody>
+              {products.map((p) => (
+                <tr key={p.id} className="border-t border-border">
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      <ProductLogo
+                        logoUrl={p.logoUrl}
+                        icon={p.icon}
+                        name={p.name}
+                        className="h-9 w-9 rounded-lg bg-secondary text-xl"
+                        emojiClassName="text-xl"
+                      />
+
+                      <div>
+                        <div className="font-semibold">{p.name}</div>
+                        <div className="text-xs text-muted-foreground line-clamp-1">{p.shortDescription}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td>{p.category}</td>
+                  <td className="font-semibold">${p.price}</td>
+                  <td>{p.stock}</td>
+                  <td className="px-4 py-3 text-right">
+                    <div className="inline-flex gap-1">
+                      <button onClick={() => setEditing(p)} className="rounded-lg p-2 hover:bg-secondary"><Pencil className="h-4 w-4" /></button>
+                      <button
+                        onClick={async () => {
+                          await deleteProduct(p.id);
+                          qc.invalidateQueries({ queryKey: ["products"] });
+                          toast.success("Product deleted");
+                        }}
+                        className="rounded-lg p-2 text-destructive hover:bg-destructive/10"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {editing && (
+        <EditModal
+          product={editing}
+          existing={products.some((p) => p.id === editing.id)}
+          onClose={() => setEditing(null)}
+          onSave={async (p) => {
+            const existing = products.some((x) => x.id === p.id);
+            if (existing) await updateProduct(p); else await createProduct(p);
+            qc.invalidateQueries({ queryKey: ["products"] });
+            toast.success(existing ? "Product updated" : "Product created");
+            setEditing(null);
+          }}
+        />
+      )}
+    </AdminShell>
+  );
+}
+
+function EditModal({ product, existing, onClose, onSave }: { product: Product; existing: boolean; onClose: () => void; onSave: (p: Product) => void }) {
+  const [p, setP] = useState<Product>(product);
+  const [featuresText, setFeaturesText] = useState(product.features.join("\n"));
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-background/80 p-4 backdrop-blur" onClick={onClose}>
+      <div className="w-full max-w-2xl rounded-2xl glass-strong p-6" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-bold">{existing ? "Edit" : "Add"} Product</h2>
+          <button onClick={onClose} className="rounded-lg p-1 hover:bg-secondary"><X className="h-4 w-4" /></button>
+        </div>
+        <div className="mt-4 grid max-h-[70vh] gap-3 overflow-y-auto sm:grid-cols-2">
+          <Input label="Name" value={p.name} onChange={(v) => setP({ ...p, name: v })} />
+          <Input label="Category" value={p.category} onChange={(v) => setP({ ...p, category: v })} />
+          <Input className="sm:col-span-2" label="Product Logo / Image URL" value={p.logoUrl ?? ""} onChange={(v) => setP({ ...p, logoUrl: v || undefined })} />
+          <Input label="Icon emoji fallback" value={p.icon} onChange={(v) => setP({ ...p, icon: v })} />
+          <Input label="Badge" value={p.badge ?? ""} onChange={(v) => setP({ ...p, badge: v || undefined })} />
+          <Input label="Price" type="number" value={String(p.price)} onChange={(v) => setP({ ...p, price: parseFloat(v) || 0 })} />
+          <Input label="Original Price" type="number" value={String(p.originalPrice ?? "")} onChange={(v) => setP({ ...p, originalPrice: v ? parseFloat(v) : undefined })} />
+          <Input label="Stock" type="number" value={String(p.stock)} onChange={(v) => setP({ ...p, stock: parseInt(v) || 0 })} />
+          <Input label="Delivery method" value={p.deliveryMethod} onChange={(v) => setP({ ...p, deliveryMethod: v })} />
+          <Input className="sm:col-span-2" label="Short description" value={p.shortDescription} onChange={(v) => setP({ ...p, shortDescription: v })} />
+          <Textarea className="sm:col-span-2" label="Description" value={p.description} onChange={(v) => setP({ ...p, description: v })} />
+          <Textarea
+            className="sm:col-span-2"
+            label="Features (one per line)"
+            value={featuresText}
+            onChange={(v) => { setFeaturesText(v); setP({ ...p, features: v.split("\n").map(s => s.trim()).filter(Boolean) }); }}
+          />
+          <Textarea className="sm:col-span-2" label="Terms" value={p.terms} onChange={(v) => setP({ ...p, terms: v })} />
+        </div>
+        <div className="mt-5 flex justify-end gap-2">
+          <button onClick={onClose} className="rounded-xl border border-border px-4 py-2 text-sm">Cancel</button>
+          <button onClick={() => onSave(p)} className="rounded-xl bg-gradient-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-glow">
+            Save
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Input({ label, value, onChange, type = "text", className = "" }: { label: string; value: string; onChange: (v: string) => void; type?: string; className?: string }) {
+  return (
+    <label className={`block ${className}`}>
+      <span className="text-xs text-muted-foreground">{label}</span>
+      <input type={type} value={value} onChange={(e) => onChange(e.target.value)}
+        className="mt-1 w-full rounded-lg bg-input/50 px-3 py-2 text-sm outline-none ring-1 ring-border focus:ring-primary" />
+    </label>
+  );
+}
+function Textarea({ label, value, onChange, className = "" }: { label: string; value: string; onChange: (v: string) => void; className?: string }) {
+  return (
+    <label className={`block ${className}`}>
+      <span className="text-xs text-muted-foreground">{label}</span>
+      <textarea value={value} rows={3} onChange={(e) => onChange(e.target.value)}
+        className="mt-1 w-full rounded-lg bg-input/50 px-3 py-2 text-sm outline-none ring-1 ring-border focus:ring-primary" />
+    </label>
+  );
+}
