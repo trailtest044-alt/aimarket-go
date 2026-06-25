@@ -1,86 +1,61 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { RefreshCcw, Search, ClipboardList, Inbox } from "lucide-react";
+import { RefreshCcw, Search, ClipboardList, Inbox, AlertCircle } from "lucide-react";
 import { AdminShell } from "@/components/admin-shell";
-import { getOrders, trackOrdersByCode, formatMoney } from "@/lib/api";
+import { searchAdminOrders, trackOrdersByCode, formatMoney } from "@/lib/api";
 import type { Order } from "@/lib/mock-data";
 
 export const Route = createFileRoute("/admin/track-orders")({ component: AdminTrackOrders });
 
-function searchableText(o: Order) {
-  return [
-    o.id,
-    o.transactionId,
-    o.customerOrderRef || "",
-    o.customerName,
-    o.customerEmail,
-    o.contact,
-    o.productName,
-    o.productId,
-    o.paymentMethod,
-    o.paymentChannel,
-    o.currency || "",
-    o.priceRegion || "",
-    o.status,
-    o.approvedByNickname || "",
-    o.deliveredByNickname || "",
-    o.rejectedByNickname || "",
-    o.reviewedByNickname || "",
-  ]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase();
+function normalize(value: unknown) {
+  return String(value || "").toLowerCase().trim();
+}
+
+function mergeOrders(adminOrders: Order[], publicOrders: Order[]) {
+  const map = new Map<string, Order>();
+  [...publicOrders, ...adminOrders].forEach((order) => map.set(order.id, order));
+  return Array.from(map.values());
 }
 
 function AdminTrackOrders() {
   const [q, setQ] = useState("");
   const [status, setStatus] = useState<Order["status"] | "all">("all");
   const [searched, setSearched] = useState(false);
+  const query = q.trim();
 
-  const searchCode = q.trim();
-
-  // Load the admin order list for broad admin searches.
-  // Some older backend deployments may return an empty admin list, so when a code is typed
-  // we also call the public Track Orders API, because that is already proven to work for customers.
-  const { data: allOrders = [], isLoading: isAdminLoading, refetch, isFetching } = useQuery({
-    queryKey: ["orders"],
-    queryFn: getOrders,
+  const adminSearch = useQuery({
+    queryKey: ["admin-advanced-order-search", query, status],
+    queryFn: () => searchAdminOrders(query, status),
+    enabled: false,
     retry: 1,
   });
 
-  const { data: publicMatches = [], isLoading: isPublicLoading, refetch: refetchPublic } = useQuery({
-    queryKey: ["admin-track-public-code", searchCode],
+  const publicCodeSearch = useQuery({
+    queryKey: ["admin-public-track-fallback", query],
     queryFn: async () => {
-      if (!searchCode || searchCode.length < 3) return [];
-      const tracked = await trackOrdersByCode(searchCode);
+      if (!query || query.length < 3) return [];
+      const tracked = await trackOrdersByCode(query);
       return tracked.map((item) => item.order);
     },
-    enabled: !!searchCode && searchCode.length >= 3,
+    enabled: false,
     retry: 1,
   });
 
-  const isLoading = isAdminLoading || isPublicLoading;
+  const orders = useMemo(() => mergeOrders(adminSearch.data || [], publicCodeSearch.data || []), [adminSearch.data, publicCodeSearch.data]);
+  const isLoading = adminSearch.isFetching || publicCodeSearch.isFetching;
+  const hasError = !!adminSearch.error;
 
-  const results = useMemo(() => {
-    const needle = searchCode.toLowerCase();
-    const merged = new Map<string, Order>();
-    [...publicMatches, ...allOrders].forEach((order) => merged.set(order.id, order));
-
-    return Array.from(merged.values()).filter((o) => {
-      const statusOk = status === "all" || o.status === status;
-      if (!statusOk) return false;
-      if (!needle) return true;
-      // Public track endpoint returns exact transaction/order matches, so keep those.
-      const exactPublicHit = publicMatches.some((x) => x.id === o.id);
-      return exactPublicHit || searchableText(o).includes(needle);
-    });
-  }, [allOrders, publicMatches, searchCode, status]);
-
-  function run() {
+  async function run() {
     setSearched(true);
-    refetch();
-    refetchPublic();
+    await Promise.allSettled([adminSearch.refetch(), publicCodeSearch.refetch()]);
+  }
+
+  function statusClass(value: Order["status"]) {
+    if (value === "delivered") return "bg-emerald-100 text-emerald-700 ring-emerald-200";
+    if (value === "approved") return "bg-sky-100 text-sky-700 ring-sky-200";
+    if (value === "rejected") return "bg-rose-100 text-rose-700 ring-rose-200";
+    return "bg-amber-100 text-amber-700 ring-amber-200";
   }
 
   return (
@@ -92,36 +67,30 @@ function AdminTrackOrders() {
               <ClipboardList className="h-4 w-4 text-primary" /> Advanced order search
             </div>
             <p className="mt-2 text-sm text-muted-foreground">
-              Search by transaction ID, order ID/reference, customer name, Gmail/email, phone/WhatsApp, product, status, or admin nickname.
+              Admin search supports customer name, Gmail/email, phone/WhatsApp, transaction ID, order ID/reference, product, status, payment method, and admin nickname.
             </p>
           </div>
           <button
-            onClick={() => refetch()}
+            onClick={run}
             className="inline-flex items-center gap-2 rounded-2xl bg-secondary px-4 py-2 text-xs font-semibold hover:bg-secondary/80"
           >
-            <RefreshCcw className={`h-3.5 w-3.5 ${isFetching ? "animate-spin" : ""}`} /> Refresh
+            <RefreshCcw className={`h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""}`} /> Refresh
           </button>
         </div>
 
         <div className="mt-5 grid gap-3 lg:grid-cols-[1fr_180px_auto]">
           <input
             value={q}
-            onChange={(e) => {
-              setQ(e.target.value);
-              if (e.target.value.trim()) setSearched(true);
-            }}
+            onChange={(e) => setQ(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter") run();
             }}
-            placeholder="Name, email, phone, Transaction ID, Order ID, product..."
+            placeholder="Search name, email, phone, transaction ID, order ID, product, admin..."
             className="rounded-2xl bg-input/70 px-4 py-3 text-sm outline-none ring-1 ring-border focus:ring-primary"
           />
           <select
             value={status}
-            onChange={(e) => {
-              setStatus(e.target.value as Order["status"] | "all");
-              setSearched(true);
-            }}
+            onChange={(e) => setStatus(e.target.value as Order["status"] | "all")}
             className="rounded-2xl bg-input/70 px-4 py-3 text-sm outline-none ring-1 ring-border focus:ring-primary"
           >
             <option value="all">All status</option>
@@ -139,15 +108,13 @@ function AdminTrackOrders() {
         </div>
 
         <div className="mt-4 rounded-2xl bg-white/50 px-4 py-3 text-xs text-muted-foreground ring-1 ring-border/70">
-          Loaded admin orders: <span className="font-semibold text-foreground">{allOrders.length}</span>
-          {searched && (
-            <>
-              {" "}• Public code matches: <span className="font-semibold text-foreground">{publicMatches.length}</span>
-              {" "}• Matching results: <span className="font-semibold text-foreground">{results.length}</span>
-            </>
-          )}
-          {allOrders.length === 0 && !isLoading && (
-            <span className="ml-2 text-amber-700">Admin list is empty. Code search still checks the customer Track Orders API.</span>
+          Admin results: <span className="font-semibold text-foreground">{adminSearch.data?.length || 0}</span>
+          {" "}• Code fallback: <span className="font-semibold text-foreground">{publicCodeSearch.data?.length || 0}</span>
+          {" "}• Showing: <span className="font-semibold text-foreground">{orders.length}</span>
+          {hasError && (
+            <span className="ml-2 inline-flex items-center gap-1 text-rose-700">
+              <AlertCircle className="h-3.5 w-3.5" /> Admin API search failed. Backend patch/redeploy needed.
+            </span>
           )}
         </div>
       </div>
@@ -167,16 +134,22 @@ function AdminTrackOrders() {
           </thead>
           <tbody>
             {isLoading ? (
-              <tr><td colSpan={7} className="p-8 text-center text-muted-foreground">Loading orders...</td></tr>
-            ) : results.length === 0 ? (
+              <tr><td colSpan={7} className="p-8 text-center text-muted-foreground">Searching orders...</td></tr>
+            ) : !searched ? (
+              <tr>
+                <td colSpan={7} className="p-10 text-center text-muted-foreground">
+                  Search by name, email, phone, transaction ID, order ID, product, or admin nickname.
+                </td>
+              </tr>
+            ) : orders.length === 0 ? (
               <tr>
                 <td colSpan={7} className="p-10 text-center text-muted-foreground">
                   <Inbox className="mx-auto mb-3 h-8 w-8 opacity-60" />
-                  {allOrders.length === 0 ? "No orders loaded from admin API." : "No matching orders found."}
+                  No matching orders found.
                 </td>
               </tr>
             ) : (
-              results.map((o) => (
+              orders.map((o) => (
                 <tr key={o.id} className="border-t border-border align-top">
                   <td className="px-4 py-3">
                     <div className="font-mono text-xs font-semibold">{o.id}</div>
@@ -195,7 +168,9 @@ function AdminTrackOrders() {
                     <div className="text-xs text-muted-foreground">{o.paymentChannel || "—"}</div>
                   </td>
                   <td className="font-semibold">{formatMoney(o.amount, o.currency)}</td>
-                  <td><span className="rounded-full bg-secondary px-3 py-1 text-xs font-semibold capitalize">{o.status}</span></td>
+                  <td>
+                    <span className={`rounded-full px-3 py-1 text-xs font-semibold capitalize ring-1 ${statusClass(o.status)}`}>{o.status}</span>
+                  </td>
                   <td>
                     <div className="text-xs">{o.approvedByNickname && `Approved by ${o.approvedByNickname}`}</div>
                     <div className="text-xs">{o.deliveredByNickname && `Delivered by ${o.deliveredByNickname}`}</div>
