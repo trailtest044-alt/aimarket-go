@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { RefreshCcw, Search, ClipboardList, Inbox } from "lucide-react";
 import { AdminShell } from "@/components/admin-shell";
-import { getOrders, formatMoney } from "@/lib/api";
+import { getOrders, trackOrdersByCode, formatMoney } from "@/lib/api";
 import type { Order } from "@/lib/mock-data";
 
 export const Route = createFileRoute("/admin/track-orders")({ component: AdminTrackOrders });
@@ -38,27 +38,49 @@ function AdminTrackOrders() {
   const [status, setStatus] = useState<Order["status"] | "all">("all");
   const [searched, setSearched] = useState(false);
 
-  // Important: load the real admin order list first, then filter locally.
-  // This makes Track Orders work even if the backend /orders/search endpoint is unavailable
-  // or an older Render deployment is still serving a different search route.
-  const { data: allOrders = [], isLoading, refetch, isFetching } = useQuery({
+  const searchCode = q.trim();
+
+  // Load the admin order list for broad admin searches.
+  // Some older backend deployments may return an empty admin list, so when a code is typed
+  // we also call the public Track Orders API, because that is already proven to work for customers.
+  const { data: allOrders = [], isLoading: isAdminLoading, refetch, isFetching } = useQuery({
     queryKey: ["orders"],
     queryFn: getOrders,
+    retry: 1,
   });
 
+  const { data: publicMatches = [], isLoading: isPublicLoading, refetch: refetchPublic } = useQuery({
+    queryKey: ["admin-track-public-code", searchCode],
+    queryFn: async () => {
+      if (!searchCode || searchCode.length < 3) return [];
+      const tracked = await trackOrdersByCode(searchCode);
+      return tracked.map((item) => item.order);
+    },
+    enabled: !!searchCode && searchCode.length >= 3,
+    retry: 1,
+  });
+
+  const isLoading = isAdminLoading || isPublicLoading;
+
   const results = useMemo(() => {
-    const needle = q.trim().toLowerCase();
-    return allOrders.filter((o) => {
+    const needle = searchCode.toLowerCase();
+    const merged = new Map<string, Order>();
+    [...publicMatches, ...allOrders].forEach((order) => merged.set(order.id, order));
+
+    return Array.from(merged.values()).filter((o) => {
       const statusOk = status === "all" || o.status === status;
       if (!statusOk) return false;
       if (!needle) return true;
-      return searchableText(o).includes(needle);
+      // Public track endpoint returns exact transaction/order matches, so keep those.
+      const exactPublicHit = publicMatches.some((x) => x.id === o.id);
+      return exactPublicHit || searchableText(o).includes(needle);
     });
-  }, [allOrders, q, status]);
+  }, [allOrders, publicMatches, searchCode, status]);
 
   function run() {
     setSearched(true);
     refetch();
+    refetchPublic();
   }
 
   return (
@@ -117,14 +139,15 @@ function AdminTrackOrders() {
         </div>
 
         <div className="mt-4 rounded-2xl bg-white/50 px-4 py-3 text-xs text-muted-foreground ring-1 ring-border/70">
-          Loaded orders: <span className="font-semibold text-foreground">{allOrders.length}</span>
+          Loaded admin orders: <span className="font-semibold text-foreground">{allOrders.length}</span>
           {searched && (
             <>
+              {" "}• Public code matches: <span className="font-semibold text-foreground">{publicMatches.length}</span>
               {" "}• Matching results: <span className="font-semibold text-foreground">{results.length}</span>
             </>
           )}
           {allOrders.length === 0 && !isLoading && (
-            <span className="ml-2 text-amber-700">No orders loaded from admin API yet. Check Pending/Delivered pages or backend deploy.</span>
+            <span className="ml-2 text-amber-700">Admin list is empty. Code search still checks the customer Track Orders API.</span>
           )}
         </div>
       </div>
