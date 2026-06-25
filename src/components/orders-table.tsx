@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { getOrders, updateOrderStatus } from "@/lib/api";
+import { getOrders, updateOrderStatus, formatMoney } from "@/lib/api";
 import type { Order } from "@/lib/mock-data";
 import { toast } from "sonner";
 import { Check, X, Truck, Inbox } from "lucide-react";
@@ -64,7 +64,7 @@ export function OrdersTable({ status }: { status: Order["status"] }) {
                 <div className="text-xs text-muted-foreground">{o.paymentChannel}</div>
               </td>
               <td className="font-mono text-xs">{o.transactionId}</td>
-              <td className="font-semibold">${o.amount.toFixed(2)}</td>
+              <td className="font-semibold">{formatMoney(o.amount, o.currency)}</td>
               <td className="px-4 py-3">
                 <div className="flex flex-wrap justify-end gap-1">
                   {status === "pending" && (
@@ -81,14 +81,17 @@ export function OrdersTable({ status }: { status: Order["status"] }) {
                     </>
                   )}
                   {status === "approved" && (
-                    <span className="text-xs text-muted-foreground">Delivery unlocked for customer</span>
+                    <>
+                      <span className="text-xs text-muted-foreground">Delivery unlocked {o.approvedByNickname ? `by ${o.approvedByNickname}` : ""}</span>
+                      <button onClick={() => setStatus(o.id, "delivered")} className="inline-flex items-center gap-1 rounded-lg bg-gradient-primary px-2.5 py-1 text-xs font-semibold text-primary-foreground shadow-glow"><Truck className="h-3 w-3" /> Mark Delivered</button>
+                    </>
                   )}
                   {status === "rejected" && (
                     <button onClick={() => setStatus(o.id, "pending")} className="rounded-lg bg-secondary px-2.5 py-1 text-xs font-semibold hover:bg-secondary/80">
                       Restore
                     </button>
                   )}
-                  {status === "delivered" && <span className="text-xs text-muted-foreground">Completed</span>}
+                  {status === "delivered" && <span className="text-xs text-muted-foreground">Completed {o.deliveredByNickname ? `by ${o.deliveredByNickname}` : ""}</span>}
                 </div>
               </td>
             </tr>

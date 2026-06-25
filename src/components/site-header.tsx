@@ -108,9 +108,7 @@ export function SiteFooter() {
           </div>
           <div>
             <h4 className="text-sm font-semibold">Support</h4>
-            <p className="mt-3 text-sm text-muted-foreground">
-              Need help with your order? Contact us on WhatsApp or Telegram.
-            </p>
+            <a href="https://api.whatsapp.com/send?phone=8801964719770" target="_blank" rel="noreferrer" className="mt-3 inline-flex rounded-xl bg-gradient-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-glow">Contact Support</a>
           </div>
         </div>
         <div className="mt-8 border-t border-border/60 pt-6 text-center text-xs text-muted-foreground">

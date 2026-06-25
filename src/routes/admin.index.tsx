@@ -1,69 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { Package, Clock, CheckCircle2, Truck, Boxes } from "lucide-react";
+import { Package, Clock, CheckCircle2, Truck, Boxes, XCircle, TrendingUp } from "lucide-react";
 import { AdminShell, StatCard } from "@/components/admin-shell";
-import { getOrders, getProducts, getStock } from "@/lib/api";
+import { getDashboard, formatMoney } from "@/lib/api";
 
-export const Route = createFileRoute("/admin/")({
-  head: () => ({ meta: [{ title: "Admin Dashboard" }, { name: "robots", content: "noindex" }] }),
-  component: AdminDashboard,
-});
-
-function AdminDashboard() {
-  const { data: orders = [] } = useQuery({ queryKey: ["orders"], queryFn: getOrders });
-  const { data: products = [] } = useQuery({ queryKey: ["products"], queryFn: getProducts });
-  const { data: stock = [] } = useQuery({ queryKey: ["stock"], queryFn: getStock });
-
-  const pending = orders.filter((o) => o.status === "pending").length;
-  const approved = orders.filter((o) => o.status === "approved").length;
-  const delivered = orders.filter((o) => o.status === "delivered").length;
-  const available = stock.filter((s) => s.status === "available").length;
-
-  return (
-    <AdminShell title="Dashboard">
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-        <StatCard label="Total Products" value={products.length} icon={Package} accent="primary" />
-        <StatCard label="Pending Orders" value={pending} icon={Clock} accent="warning" />
-        <StatCard label="Approved Orders" value={approved} icon={CheckCircle2} accent="accent" />
-        <StatCard label="Delivered" value={delivered} icon={Truck} accent="success" />
-        <StatCard label="Available Stock" value={available} icon={Boxes} accent="primary" />
-      </div>
-
-      <div className="mt-8 glass rounded-2xl p-6">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Recent Orders</h2>
-        {orders.length === 0 ? (
-          <div className="py-8 text-center text-sm text-muted-foreground">No orders yet.</div>
-        ) : (
-          <div className="mt-4 overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="text-left text-xs uppercase text-muted-foreground">
-                <tr><th className="py-2">Order</th><th>Product</th><th>Customer</th><th>Amount</th><th>Status</th></tr>
-              </thead>
-              <tbody>
-                {orders.slice(0, 6).map((o) => (
-                  <tr key={o.id} className="border-t border-border">
-                    <td className="py-3 font-mono text-xs">{o.id}</td>
-                    <td>{o.productName}</td>
-                    <td>{o.customerName}</td>
-                    <td className="font-semibold">${o.amount.toFixed(2)}</td>
-                    <td><StatusBadge status={o.status} /></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-    </AdminShell>
-  );
-}
-
-function StatusBadge({ status }: { status: string }) {
-  const map: Record<string, string> = {
-    pending: "bg-warning/15 text-warning",
-    approved: "bg-accent/15 text-accent",
-    delivered: "bg-success/15 text-success",
-    rejected: "bg-destructive/15 text-destructive",
-  };
-  return <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase ${map[status]}`}>{status}</span>;
-}
+export const Route = createFileRoute("/admin/")({ component: AdminDashboard });
+function AdminDashboard() { const { data, isLoading } = useQuery({ queryKey: ["dashboard"], queryFn: getDashboard }); const s = data?.stats; return <AdminShell title="Dashboard">{isLoading || !s ? <div className="h-64 animate-pulse rounded-2xl bg-secondary/30" /> : <><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7"><StatCard label="Products" value={s.totalProducts} icon={Package} accent="primary" /><StatCard label="Pending" value={s.pendingOrders} icon={Clock} accent="warning" /><StatCard label="Sold" value={s.soldOrders} icon={TrendingUp} accent="success" /><StatCard label="Approved" value={s.approvedOrders} icon={CheckCircle2} accent="accent" /><StatCard label="Delivered" value={s.deliveredOrders} icon={Truck} accent="success" /><StatCard label="Rejected" value={s.rejectedOrders} icon={XCircle} accent="destructive" /><StatCard label="Stock" value={s.availableStock} icon={Boxes} accent="primary" /></div><div className="mt-8 grid gap-6 xl:grid-cols-[1.35fr_.9fr]"><div className="glass rounded-3xl p-6"><h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Product-wise Sales</h2>{data.salesByProduct.length === 0 ? <div className="py-8 text-center text-sm text-muted-foreground">No sold products yet. Approved orders count as sales.</div> : <div className="mt-4 overflow-x-auto"><table className="w-full text-sm"><thead className="text-left text-xs uppercase text-muted-foreground"><tr><th className="py-2">Product</th><th>Sold</th><th>BDT</th><th>PKR</th><th>World</th></tr></thead><tbody>{data.salesByProduct.map((r) => <tr key={r.productId} className="border-t border-border"><td className="py-3 font-medium">{r.productName}</td><td className="font-bold text-success">{r.sold}</td><td>{formatMoney(r.revenueBDT, "BDT")}</td><td>{formatMoney(r.revenuePKR, "PKR")}</td><td>{r.revenueWorld.toFixed(2)} USDT/USD</td></tr>)}</tbody></table></div>}</div><div className="glass rounded-3xl p-6"><h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Recent Activity</h2>{data.recentActivity.length === 0 ? <div className="py-8 text-center text-sm text-muted-foreground">No activity yet.</div> : <div className="mt-4 space-y-3">{data.recentActivity.slice(0, 10).map((a, i) => <div key={a._id || i} className="rounded-2xl bg-white/60 p-3 text-sm"><div className="font-medium">{a.message}</div><div className="mt-1 text-[11px] text-muted-foreground">{a.createdAt ? new Date(a.createdAt).toLocaleString() : ""}</div></div>)}</div>}</div></div><div className="mt-8 glass rounded-3xl p-6"><h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Low Stock</h2>{data.lowStock.length === 0 ? <div className="py-8 text-center text-sm text-muted-foreground">No low stock alerts.</div> : <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{data.lowStock.map((x) => <div key={x.productId} className="rounded-2xl bg-warning/10 p-4 text-sm"><div className="font-semibold">{x.productName}</div><div className="text-warning">Only {x.available} left</div></div>)}</div>}</div></>}</AdminShell>; }

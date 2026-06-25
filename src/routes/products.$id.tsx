@@ -1,6 +1,6 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { getProductById } from "@/lib/api";
+import { getProductById, formatMoney } from "@/lib/api";
 import { SiteHeader, SiteFooter } from "@/components/site-header";
 import { ProductLogo } from "@/components/product-logo";
 import { Check, Clock, ShieldCheck, ArrowRight, ArrowLeft } from "lucide-react";
@@ -92,9 +92,9 @@ function ProductDetailsPage() {
 
           <div>
             <div className="flex items-baseline gap-3">
-              <span className="text-5xl font-bold text-gradient">${product.price}</span>
+              <span className="text-5xl font-bold text-gradient">{formatMoney(product.price, product.currency)}</span>
               {product.originalPrice && (
-                <span className="text-lg text-muted-foreground line-through">${product.originalPrice}</span>
+                <span className="text-lg text-muted-foreground line-through">{formatMoney(product.originalPrice, product.currency)}</span>
               )}
             </div>
             <div className="mt-2 flex items-center gap-2 text-sm">
@@ -143,7 +143,7 @@ function ProductDetailsPage() {
                 <Link
                   to="/checkout/$productId"
                   params={{ productId: product.id }}
-                  className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-primary px-6 py-3.5 text-sm font-semibold text-primary-foreground shadow-glow transition hover:scale-[1.01]"
+                  className="buy-now-btn inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-gradient-primary px-6 py-3.5 text-sm font-semibold text-primary-foreground shadow-glow transition hover:scale-[1.01]"
                 >
                   Buy Now <ArrowRight className="h-4 w-4" />
                 </Link>
