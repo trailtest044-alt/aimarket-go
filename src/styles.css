@@ -268,3 +268,36 @@
 @media (max-width: 900px) { .support-float { display:none; } }
 
 .waiting-ring { width: 72px; height: 72px; border-radius: 999px; border: 6px solid color-mix(in oklab, var(--primary) 20%, white); border-top-color: var(--primary); animation: spin 1s linear infinite; }
+
+/* Professional order pending review animation */
+.review-status-loader {
+  position: relative;
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  background: conic-gradient(from 0deg, color-mix(in oklab, var(--warning) 80%, white), color-mix(in oklab, var(--primary) 70%, white), transparent 70%);
+  animation: review-spin 1.6s linear infinite;
+  box-shadow: 0 16px 35px -18px color-mix(in oklab, var(--warning) 70%, black);
+}
+.review-status-loader::before {
+  content: "";
+  position: absolute;
+  inset: 5px;
+  border-radius: inherit;
+  background: color-mix(in oklab, var(--card) 95%, white);
+}
+.review-status-loader span {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 1;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--warning);
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 0 8px color-mix(in oklab, var(--warning) 18%, transparent);
+  animation: review-pulse 1.15s ease-in-out infinite;
+}
+@keyframes review-spin { to { transform: rotate(360deg); } }
+@keyframes review-pulse { 0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 1; } 50% { transform: translate(-50%, -50%) scale(.72); opacity: .68; } }
