@@ -24,9 +24,7 @@ export function ProductCard({ p }: { p: Product }) {
             <span className="text-2xl font-bold text-gradient">{price}</span>
             {original && <span className="text-sm text-muted-foreground line-through">{original}</span>}
           </div>
-          <div className="mt-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-            {p.priceRegion === "bd" ? "Bangladesh price" : p.priceRegion === "pk" ? "Pakistan price" : "Worldwide price"}
-          </div>
+          {/* Customer-facing cards should show only the final detected price, not the internal region label. */}
           <div className="mt-1 flex items-center gap-1.5 text-xs">
             <span className={`h-1.5 w-1.5 rounded-full ${inStock ? "bg-success" : "bg-destructive"}`} />
             <span className={inStock ? "text-success" : "text-destructive"}>{inStock ? `${p.stock} in stock` : "Out of stock"}</span>

@@ -7,6 +7,7 @@ export function SiteHeader() {
   const nav = [
     { to: "/", label: "Home" },
     { to: "/products", label: "Products" },
+    { to: "/track-orders", label: "Track Orders" },
     { to: "/admin/login", label: "Admin" },
   ] as const;
 
@@ -102,7 +103,7 @@ export function SiteFooter() {
             <h4 className="text-sm font-semibold">Quick Links</h4>
             <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
               <li><Link to="/products" className="hover:text-foreground">All Products</Link></li>
-              <li><Link to="/" className="hover:text-foreground">Categories</Link></li>
+              <li><Link to="/track-orders" className="hover:text-foreground">Track Your Orders</Link></li>
               <li><Link to="/admin/login" className="hover:text-foreground">Admin</Link></li>
             </ul>
           </div>

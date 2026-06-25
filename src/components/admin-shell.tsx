@@ -1,5 +1,5 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { LayoutDashboard, Package, Wallet, Boxes, Clock, CheckCircle2, Truck, XCircle, LogOut, Sparkles, Users } from "lucide-react";
+import { LayoutDashboard, Package, Wallet, Boxes, Clock, CheckCircle2, Truck, XCircle, LogOut, Sparkles, Users, Search } from "lucide-react";
 import { adminLogout, isAdminAuthed, getCurrentAdmin } from "@/lib/api";
 import { useEffect, type ReactNode, type ComponentType } from "react";
 import { toast } from "sonner";
@@ -14,6 +14,7 @@ const items: NavItem[] = [
   { to: "/admin/orders/approved", label: "Approved Orders", icon: CheckCircle2 },
   { to: "/admin/orders/delivered", label: "Delivered Orders", icon: Truck },
   { to: "/admin/orders/rejected", label: "Rejected Orders", icon: XCircle },
+  { to: "/admin/track-orders", label: "Track Orders", icon: Search },
   { to: "/admin/users", label: "Admin Users", icon: Users, ownerOnly: true },
 ];
 

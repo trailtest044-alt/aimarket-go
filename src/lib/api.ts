@@ -100,6 +100,8 @@ export function priceForRegion(product: Product, region: PriceRegion) {
   return { amount: product.priceUSDT, currency: product.worldwideCurrency as CurrencyCode };
 }
 export function methodForRegion(region: PriceRegion): "bangladesh" | "pakistan" | "binance" { return region === "bd" ? "bangladesh" : region === "pk" ? "pakistan" : "binance"; }
+export function allowedPaymentMethods(region: PriceRegion): Array<"bangladesh" | "pakistan" | "binance"> { return region === "bd" ? ["bangladesh"] : ["pakistan", "binance"]; }
+export function priceRegionForPaymentMethod(method: "bangladesh" | "pakistan" | "binance"): PriceRegion { if (method === "bangladesh") return "bd"; if (method === "pakistan") return "pk"; return "world"; }
 
 function productToFrontend(p: BackendProduct): Product {
   const priceBDT = money(p.priceBDT);
@@ -194,17 +196,62 @@ export async function deleteProduct(id: string): Promise<void> { if (IS_MOCK_MOD
 export async function getCategories(): Promise<typeof mockCategories> { if (IS_MOCK_MODE) return delay(mockCategories); const products = await getProducts(); const categories = Array.from(new Set(products.map((p) => p.category).filter(Boolean))); return [{ id: "all", name: "All Products", icon: "🌐" }, ...categories.map((name) => ({ id: name, name, icon: "✨" }))]; }
 
 export async function getOrders(): Promise<Order[]> { if (IS_MOCK_MODE) return delay(load(STORAGE_KEYS.orders, mockOrders)); const data = await http<{ orders: BackendOrder[] }>("/admin/orders"); return data.orders.map(orderToFrontend); }
+export async function searchAdminOrders(query: string, status?: Order["status"] | "all"): Promise<Order[]> {
+  if (IS_MOCK_MODE) {
+    const q = query.trim().toLowerCase();
+    const all = await getOrders();
+    return all.filter((o) => (!status || status === "all" || o.status === status) && (!q || [o.id, o.transactionId, o.customerOrderRef || "", o.customerName, o.customerEmail, o.contact, o.productName, o.paymentMethod, o.approvedByNickname || "", o.deliveredByNickname || ""].some((v) => String(v).toLowerCase().includes(q))));
+  }
+  const params = new URLSearchParams();
+  if (query.trim()) params.set("q", query.trim());
+  if (status && status !== "all") params.set("status", status);
+  const data = await http<{ orders: BackendOrder[] }>(`/admin/orders/search?${params.toString()}`);
+  return data.orders.map(orderToFrontend);
+}
 export async function getOrderById(id: string): Promise<Order | null> { if (IS_MOCK_MODE) { const list = await getOrders(); return list.find((o) => o.id === id) ?? null; } const token = getOrderToken(id); if (!token) return null; try { const data = await http<{ order: BackendOrder }>(`/orders/${id}/status?token=${encodeURIComponent(token)}`); return orderToFrontend(data.order); } catch { return null; } }
 export async function createOrder(o: Omit<Order, "id" | "status" | "createdAt">): Promise<Order> {
   if (IS_MOCK_MODE) { const list = await getOrders(); const order: Order = { ...o, id: `ORD-${Math.floor(1000 + Math.random() * 9000)}`, status: "pending", createdAt: new Date().toISOString() }; save(STORAGE_KEYS.orders, [order, ...list]); return delay(order); }
   const productBackendId = await resolveBackendProductId(o.productId); const paymentNote = `Channel: ${o.paymentChannel}${o.customerOrderRef ? `; Reference: ${o.customerOrderRef}` : ""}`;
-  const data = await http<{ order: { orderId: string; status: Order["status"]; productTitle: string; amount: number; currency: CurrencyCode; priceRegion: PriceRegion; paymentMethod: Order["paymentMethod"]; transactionId?: string; customerOrderRef?: string }; accessToken: string }>("/orders", { method: "POST", body: JSON.stringify({ productId: productBackendId, customer: { name: o.customerName, email: o.customerEmail, whatsapp: o.contact || "" }, paymentMethod: o.paymentMethod, priceRegion: o.priceRegion || "world", transactionId: o.transactionId, customerOrderRef: o.customerOrderRef || "", paymentNote }) });
+  const data = await http<{ order: { orderId: string; status: Order["status"]; productTitle: string; amount: number; currency: CurrencyCode; priceRegion: PriceRegion; paymentMethod: Order["paymentMethod"]; transactionId?: string; customerOrderRef?: string }; accessToken: string }>("/orders", { method: "POST", body: JSON.stringify({ productId: productBackendId, customer: { name: o.customerName, email: o.customerEmail, whatsapp: o.contact || "" }, paymentMethod: o.paymentMethod, priceRegion: priceRegionForPaymentMethod(o.paymentMethod), transactionId: o.transactionId, customerOrderRef: o.customerOrderRef || "", paymentNote }) });
   saveOrderToken(data.order.orderId, data.accessToken);
   return { ...o, id: data.order.orderId, productName: data.order.productTitle || o.productName, amount: money(data.order.amount || o.amount), currency: data.order.currency, priceRegion: data.order.priceRegion, status: data.order.status, createdAt: new Date().toISOString() };
 }
 export async function updateOrderStatus(id: string, status: Order["status"]): Promise<Order | null> { if (IS_MOCK_MODE) { const list = await getOrders(); const next = list.map((o) => (o.id === id ? { ...o, status } : o)); save(STORAGE_KEYS.orders, next); return delay(next.find((o) => o.id === id) ?? null); } if (status === "approved") { const data = await http<{ order: BackendOrder }>(`/admin/orders/${id}/approve`, { method: "POST" }); return orderToFrontend(data.order); }
   if (status === "delivered") { const data = await http<{ order: BackendOrder }>(`/admin/orders/${id}/mark-delivered`, { method: "POST" }); return orderToFrontend(data.order); } if (status === "rejected") { const data = await http<{ order: BackendOrder }>(`/admin/orders/${id}/reject`, { method: "POST", body: JSON.stringify({ reason: "Rejected by admin" }) }); return orderToFrontend(data.order); } throw new Error("Restoring pending orders is not supported in live mode."); }
 export async function getOrderDelivery(orderId: string): Promise<DeliveryPayload | null> { if (IS_MOCK_MODE) return null; const token = getOrderToken(orderId); if (!token) return null; try { const data = await http<{ delivery: DeliveryPayload }>(`/orders/${orderId}/delivery?token=${encodeURIComponent(token)}`); return data.delivery; } catch { return null; } }
+export type TrackOrderResult = { order: Order; delivery?: DeliveryPayload | null };
+function trackPayloadToOrder(x: any): Order {
+  return {
+    id: x.orderId,
+    productId: "",
+    productName: x.productTitle || x.product?.title || "Product",
+    customerName: x.customer?.name || "",
+    customerEmail: x.customer?.email || "",
+    contact: x.customer?.whatsapp || "",
+    amount: money(x.amount || x.product?.price || 0),
+    currency: x.currency || x.product?.currency,
+    priceRegion: x.priceRegion || x.product?.priceRegion,
+    paymentMethod: x.paymentMethod,
+    paymentChannel: x.paymentMethod,
+    transactionId: x.transactionId || "",
+    customerOrderRef: x.customerOrderRef || "",
+    status: x.status,
+    createdAt: x.createdAt || new Date().toISOString(),
+    approvedByNickname: x.approvedByNickname || "",
+    deliveredByNickname: x.deliveredByNickname || "",
+    rejectedByNickname: x.rejectedByNickname || "",
+    reviewedByNickname: x.reviewedByNickname || "",
+  };
+}
+export async function trackOrdersByCode(code: string): Promise<TrackOrderResult[]> {
+  if (IS_MOCK_MODE) {
+    const q = code.trim().toLowerCase();
+    const list = (await getOrders()).filter((o) => [o.id, o.transactionId, o.customerOrderRef || ""].some((v) => String(v).toLowerCase() === q));
+    return list.map((order) => ({ order, delivery: null }));
+  }
+  const data = await http<{ orders: any[] }>("/track-orders", { method: "POST", body: JSON.stringify({ code }) });
+  return (data.orders || []).map((x) => ({ order: trackPayloadToOrder(x), delivery: x.delivery || null }));
+}
 
 export async function getStock(): Promise<StockItem[]> { if (IS_MOCK_MODE) return delay(load(STORAGE_KEYS.stock, mockStock)); const data = await http<{ stock: BackendStock[] }>("/admin/stock"); return data.stock.map(stockToFrontend); }
 export async function createStock(s: Omit<StockItem, "id" | "createdAt">): Promise<StockItem> { if (IS_MOCK_MODE) { const list = await getStock(); const item: StockItem = { ...s, id: `STK-${Math.floor(100 + Math.random() * 900)}`, createdAt: new Date().toISOString() }; save(STORAGE_KEYS.stock, [item, ...list]); return delay(item); } const productId = await resolveBackendProductId(s.productId); const data = await http<{ stock: BackendStock }>("/admin/stock", { method: "POST", body: JSON.stringify({ productId, type: s.email || s.password ? "credentials" : "instruction", payload: { email: s.email, password: s.password, instruction: s.instructions, videoUrl: s.videoUrl || "", imageUrl: s.imageUrl || "" }, adminNote: s.instructions || "" }) }); return stockToFrontend(data.stock); }
