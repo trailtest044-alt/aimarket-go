@@ -168,21 +168,37 @@ function orderToFrontend(o: BackendOrder): Order {
 function stockToFrontend(s: BackendStock): StockItem { const productId = typeof s.productId === "object" ? (s.productId.slug || s.productId._id || "") : (s.productId || ""); return { id: s._id, productId, email: s.payload?.email || "Encrypted", password: s.payload?.password ? "••••••••" : "Encrypted", instructions: s.payload?.instruction || s.adminNote || "Encrypted delivery item", videoUrl: s.payload?.videoUrl, imageUrl: s.payload?.imageUrl, status: s.status === "available" ? "available" : "delivered", createdAt: s.createdAt || new Date().toISOString(), addedBy: s.createdByNickname || "" }; }
 async function resolveBackendProductId(productIdOrSlug: string): Promise<string> { if (objectIdRe.test(productIdOrSlug)) return productIdOrSlug; const product = await getProductById(productIdOrSlug); return product?.backendId || productIdOrSlug; }
 
-export async function getVisitorRegion(): Promise<{ region: PriceRegion; country?: string }> {
+export async function getVisitorRegion(options: { force?: boolean } = {}): Promise<{ region: PriceRegion; country?: string }> {
   if (IS_MOCK_MODE) return { region: load<PriceRegion>(STORAGE_KEYS.region, "world") };
-  if (isBrowser) {
+
+  // Region controls price and checkout gateways, so avoid stale cached values.
+  // A previous BD/PK detection could otherwise keep showing the wrong gateway after VPN/IP changes.
+  if (isBrowser && !options.force) {
     const cached = load<{ region: PriceRegion; country?: string; ts?: number } | null>(STORAGE_KEYS.region, null);
-    if (cached?.region && cached.ts && Date.now() - cached.ts < 1000 * 60 * 60 * 12) return cached;
+    if (cached?.region && cached.ts && Date.now() - cached.ts < 1000 * 60 * 5) return cached;
   }
-  let region: PriceRegion = "world"; let country = "XX";
+
+  let region: PriceRegion = "world";
+  let country = "XX";
   try {
-    const r = await fetch("https://ipapi.co/json/");
-    if (r.ok) { const data = await r.json(); country = String(data.country_code || "XX").toUpperCase(); if (country === "BD") region = "bd"; else if (country === "PK") region = "pk"; }
+    const r = await fetch("https://ipapi.co/json/", { cache: "no-store" });
+    if (r.ok) {
+      const data = await r.json();
+      country = String(data.country_code || "XX").toUpperCase();
+      if (country === "BD") region = "bd";
+      else if (country === "PK") region = "pk";
+      else region = "world";
+    }
   } catch {}
+
   try {
     const data = await http<{ region: PriceRegion; country: string }>(`/region?region=${region}`);
-    if (data?.country && data.country !== "XX") { country = data.country; region = data.region; }
+    if (data?.region) {
+      region = data.region;
+      country = data.country || country;
+    }
   } catch {}
+
   const result = { region, country, ts: Date.now() };
   save(STORAGE_KEYS.region, result);
   return result;

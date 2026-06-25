@@ -24,9 +24,10 @@ function CheckoutPage() {
   const [channel, setChannel] = useState(""); const [txid, setTxid] = useState(""); const [orderRef, setOrderRef] = useState(""); const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    getVisitorRegion().then((r) => {
-      setVisitorRegion(r.region);
-      const methods = allowedPaymentMethods(r.region);
+    getVisitorRegion({ force: true }).then((r) => {
+      const region = r.region || "world";
+      setVisitorRegion(region);
+      const methods = allowedPaymentMethods(region);
       setMethod(methods[0]);
       setChannel("");
     });
