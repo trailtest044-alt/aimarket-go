@@ -28,6 +28,7 @@ export type Product = {
   badge?: string;
   addedBy?: string;
   updatedBy?: string;
+  sortOrder?: number;
 };
 
 export type StockItem = {

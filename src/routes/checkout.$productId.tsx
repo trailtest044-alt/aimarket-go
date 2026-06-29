@@ -6,6 +6,7 @@ import { getProductById, getPaymentSettings, createOrder, getVisitorRegion, form
 import { SiteHeader, SiteFooter } from "@/components/site-header";
 import { ProductLogo } from "@/components/product-logo";
 import { SupportPopups, SupportHelpSection } from "@/components/support-popups";
+import { ServerLoader } from "@/components/server-loader";
 import { Check, Copy, CreditCard, Loader2, ArrowLeft, PackageX } from "lucide-react";
 import type { PriceRegion } from "@/lib/mock-data";
 
@@ -53,7 +54,7 @@ function CheckoutPage() {
     } catch (err) { toast.error(err instanceof Error ? err.message : "Could not submit order. Try again."); } finally { setSubmitting(false); }
   }
 
-  if (isLoading) return <div className="min-h-screen"><SiteHeader /><div className="mx-auto max-w-4xl p-6"><div className="h-96 animate-pulse rounded-2xl bg-secondary/40" /></div></div>;
+  if (isLoading) return <div className="min-h-screen"><SiteHeader /><main className="mx-auto max-w-5xl px-4 py-10 sm:px-6"><ServerLoader title="Please wait, server loading..." message="Preparing checkout, region pricing, and payment gateways." /></main></div>;
   if (!product) throw notFound();
   if (!inStock) return <div className="min-h-screen"><SiteHeader /><SupportPopups /><main className="mx-auto max-w-2xl px-4 py-16 text-center"><div className="glass rounded-3xl p-8"><div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-destructive/15 text-destructive"><PackageX className="h-8 w-8" /></div><h1 className="mt-5 text-2xl font-bold">Out of stock</h1><p className="mt-2 text-muted-foreground">{product.name} is currently unavailable.</p><Link to="/products" className="mt-6 inline-flex items-center gap-2 rounded-xl bg-gradient-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-glow"><ArrowLeft className="h-4 w-4" /> Back to Products</Link></div></main><SiteFooter /></div>;
 

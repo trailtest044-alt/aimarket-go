@@ -132,6 +132,7 @@ function productToFrontend(p: BackendProduct): Product {
     stock: money(p.availableStock ?? 0),
     addedBy: p.createdByNickname || "",
     updatedBy: p.updatedByNickname || "",
+    sortOrder: Number(p.sortOrder ?? 0),
   };
 }
 
@@ -142,7 +143,7 @@ function productToBackend(p: Product) {
     imageUrl: p.logoUrl || "", badge: p.badge || "", icon: p.icon || "✨",
     priceBDT: money(p.priceBDT), pricePKR: money(p.pricePKR), priceUSDT: money(p.priceUSDT), worldwideCurrency: p.worldwideCurrency || "USDT",
     originalPriceBDT: money(p.originalPriceBDT), originalPricePKR: money(p.originalPricePKR), originalPriceUSDT: money(p.originalPriceUSDT),
-    features: p.features || [], deliveryMethod: p.deliveryMethod || "", terms: p.terms || "", isActive: true, sortOrder: 0,
+    features: p.features || [], deliveryMethod: p.deliveryMethod || "", terms: p.terms || "", isActive: true, sortOrder: Number(p.sortOrder ?? 0),
   };
 }
 function getAccount(method: BackendPaymentMethod | undefined, labelIncludes: string) { return method?.accounts?.find((a) => (a.label || "").toLowerCase().includes(labelIncludes))?.value || ""; }
@@ -168,27 +169,43 @@ function orderToFrontend(o: BackendOrder): Order {
 function stockToFrontend(s: BackendStock): StockItem { const productId = typeof s.productId === "object" ? (s.productId.slug || s.productId._id || "") : (s.productId || ""); return { id: s._id, productId, email: s.payload?.email || "Encrypted", password: s.payload?.password ? "••••••••" : "Encrypted", instructions: s.payload?.instruction || s.adminNote || "Encrypted delivery item", videoUrl: s.payload?.videoUrl, imageUrl: s.payload?.imageUrl, status: s.status === "available" ? "available" : "delivered", createdAt: s.createdAt || new Date().toISOString(), addedBy: s.createdByNickname || "" }; }
 async function resolveBackendProductId(productIdOrSlug: string): Promise<string> { if (objectIdRe.test(productIdOrSlug)) return productIdOrSlug; const product = await getProductById(productIdOrSlug); return product?.backendId || productIdOrSlug; }
 
-export async function getVisitorRegion(): Promise<{ region: PriceRegion; country?: string }> {
+export async function getVisitorRegion(options: { force?: boolean } = {}): Promise<{ region: PriceRegion; country?: string }> {
   if (IS_MOCK_MODE) return { region: load<PriceRegion>(STORAGE_KEYS.region, "world") };
-  if (isBrowser) {
+
+  // Region controls price and checkout gateways, so avoid stale cached values.
+  // A previous BD/PK detection could otherwise keep showing the wrong gateway after VPN/IP changes.
+  if (isBrowser && !options.force) {
     const cached = load<{ region: PriceRegion; country?: string; ts?: number } | null>(STORAGE_KEYS.region, null);
-    if (cached?.region && cached.ts && Date.now() - cached.ts < 1000 * 60 * 60 * 12) return cached;
+    if (cached?.region && cached.ts && Date.now() - cached.ts < 1000 * 60 * 5) return cached;
   }
-  let region: PriceRegion = "world"; let country = "XX";
+
+  let region: PriceRegion = "world";
+  let country = "XX";
   try {
-    const r = await fetch("https://ipapi.co/json/");
-    if (r.ok) { const data = await r.json(); country = String(data.country_code || "XX").toUpperCase(); if (country === "BD") region = "bd"; else if (country === "PK") region = "pk"; }
+    const r = await fetch("https://ipapi.co/json/", { cache: "no-store" });
+    if (r.ok) {
+      const data = await r.json();
+      country = String(data.country_code || "XX").toUpperCase();
+      if (country === "BD") region = "bd";
+      else if (country === "PK") region = "pk";
+      else region = "world";
+    }
   } catch {}
+
   try {
     const data = await http<{ region: PriceRegion; country: string }>(`/region?region=${region}`);
-    if (data?.country && data.country !== "XX") { country = data.country; region = data.region; }
+    if (data?.region) {
+      region = data.region;
+      country = data.country || country;
+    }
   } catch {}
+
   const result = { region, country, ts: Date.now() };
   save(STORAGE_KEYS.region, result);
   return result;
 }
 
-export async function getProducts(): Promise<Product[]> { if (IS_MOCK_MODE) return delay(load(STORAGE_KEYS.products, mockProducts)); const region = (await getVisitorRegion()).region; const data = await http<{ products: BackendProduct[] }>(`/products?region=${region}`); return data.products.map(productToFrontend); }
+export async function getProducts(): Promise<Product[]> { if (IS_MOCK_MODE) { const list = load(STORAGE_KEYS.products, mockProducts); return delay([...list].sort((a, b) => Number(a.sortOrder ?? 9999) - Number(b.sortOrder ?? 9999))); } const region = (await getVisitorRegion()).region; const data = await http<{ products: BackendProduct[] }>(`/products?region=${region}`); return data.products.map(productToFrontend); }
 export async function getProductById(id: string): Promise<Product | null> { if (IS_MOCK_MODE) { const list = await getProducts(); return list.find((p) => p.id === id || p.backendId === id) ?? null; } try { const region = (await getVisitorRegion()).region; if (objectIdRe.test(id)) { const list = await getProducts(); return list.find((p) => p.backendId === id) ?? null; } const data = await http<{ product: BackendProduct }>(`/products/${id}?region=${region}`); return productToFrontend(data.product); } catch { return null; } }
 export async function createProduct(p: Product): Promise<Product> { if (IS_MOCK_MODE) { const list = await getProducts(); save(STORAGE_KEYS.products, [p, ...list]); return delay(p); } const data = await http<{ product: BackendProduct }>("/admin/products", { method: "POST", body: JSON.stringify(productToBackend(p)) }); return productToFrontend(data.product); }
 export async function updateProduct(p: Product): Promise<Product> { if (IS_MOCK_MODE) { const list = await getProducts(); save(STORAGE_KEYS.products, list.map((x) => (x.id === p.id ? p : x))); return delay(p); } const backendId = p.backendId || (await resolveBackendProductId(p.id)); const data = await http<{ product: BackendProduct }>(`/admin/products/${backendId}`, { method: "PATCH", body: JSON.stringify(productToBackend(p)) }); return productToFrontend(data.product); }
@@ -196,57 +213,17 @@ export async function deleteProduct(id: string): Promise<void> { if (IS_MOCK_MOD
 export async function getCategories(): Promise<typeof mockCategories> { if (IS_MOCK_MODE) return delay(mockCategories); const products = await getProducts(); const categories = Array.from(new Set(products.map((p) => p.category).filter(Boolean))); return [{ id: "all", name: "All Products", icon: "🌐" }, ...categories.map((name) => ({ id: name, name, icon: "✨" }))]; }
 
 export async function getOrders(): Promise<Order[]> { if (IS_MOCK_MODE) return delay(load(STORAGE_KEYS.orders, mockOrders)); const data = await http<{ orders: BackendOrder[] }>("/admin/orders"); return data.orders.map(orderToFrontend); }
-function filterOrdersLocally(orders: Order[], query: string, status?: Order["status"] | "all"): Order[] {
-  const q = query.trim().toLowerCase();
-  return orders.filter((o) => {
-    const statusOk = !status || status === "all" || o.status === status;
-    if (!statusOk) return false;
-    if (!q) return true;
-    const fields = [
-      o.id,
-      o.transactionId,
-      o.customerOrderRef || "",
-      o.customerName,
-      o.customerEmail,
-      o.contact,
-      o.productName,
-      o.paymentMethod,
-      o.paymentChannel,
-      o.currency,
-      o.priceRegion,
-      o.status,
-      o.approvedByNickname || "",
-      o.deliveredByNickname || "",
-      o.rejectedByNickname || "",
-      o.reviewedByNickname || "",
-    ];
-    return fields.some((v) => String(v || "").toLowerCase().includes(q));
-  });
-}
-
 export async function searchAdminOrders(query: string, status?: Order["status"] | "all"): Promise<Order[]> {
   if (IS_MOCK_MODE) {
-    return delay(filterOrdersLocally(load(STORAGE_KEYS.orders, mockOrders), query, status));
+    const q = query.trim().toLowerCase();
+    const all = await getOrders();
+    return all.filter((o) => (!status || status === "all" || o.status === status) && (!q || [o.id, o.transactionId, o.customerOrderRef || "", o.customerName, o.customerEmail, o.contact, o.productName, o.paymentMethod, o.approvedByNickname || "", o.deliveredByNickname || ""].some((v) => String(v).toLowerCase().includes(q))));
   }
-
   const params = new URLSearchParams();
   if (query.trim()) params.set("q", query.trim());
   if (status && status !== "all") params.set("status", status);
-
-  try {
-    const data = await http<{ orders: BackendOrder[] }>(`/admin/orders/search?${params.toString()}`);
-    const mapped = data.orders.map(orderToFrontend);
-
-    // Safety fallback: if the backend search returns empty because an older Render
-    // deployment/API index is still active, search the admin order list locally.
-    if (mapped.length || !query.trim()) return mapped;
-  } catch {
-    // Fallback below keeps the admin Track Orders page useful even if
-    // /admin/orders/search is unavailable on an older backend deploy.
-  }
-
-  const allData = await http<{ orders: BackendOrder[] }>("/admin/orders");
-  return filterOrdersLocally(allData.orders.map(orderToFrontend), query, status);
+  const data = await http<{ orders: BackendOrder[] }>(`/admin/orders/search?${params.toString()}`);
+  return data.orders.map(orderToFrontend);
 }
 export async function getOrderById(id: string): Promise<Order | null> { if (IS_MOCK_MODE) { const list = await getOrders(); return list.find((o) => o.id === id) ?? null; } const token = getOrderToken(id); if (!token) return null; try { const data = await http<{ order: BackendOrder }>(`/orders/${id}/status?token=${encodeURIComponent(token)}`); return orderToFrontend(data.order); } catch { return null; } }
 export async function createOrder(o: Omit<Order, "id" | "status" | "createdAt">): Promise<Order> {

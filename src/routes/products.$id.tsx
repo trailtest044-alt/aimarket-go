@@ -3,7 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import { getProductById, formatMoney } from "@/lib/api";
 import { SiteHeader, SiteFooter } from "@/components/site-header";
 import { ProductLogo } from "@/components/product-logo";
-import { Check, Clock, ShieldCheck, ArrowRight, ArrowLeft } from "lucide-react";
+import { ServerLoader } from "@/components/server-loader";
+import { Check, Clock, ShieldCheck, ArrowRight, ArrowLeft, FileText, BadgeCheck, Sparkles } from "lucide-react";
 
 export const Route = createFileRoute("/products/$id")({
   head: ({ params }) => ({
@@ -50,9 +51,9 @@ function ProductDetailsPage() {
     return (
       <div className="min-h-screen">
         <SiteHeader />
-        <div className="mx-auto max-w-5xl p-6">
-          <div className="h-96 animate-pulse rounded-2xl bg-secondary/40" />
-        </div>
+        <main className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
+          <ServerLoader title="Please wait, server loading..." message="Opening product details and pricing." />
+        </main>
       </div>
     );
   }
@@ -62,6 +63,10 @@ function ProductDetailsPage() {
   }
 
   const inStock = product.stock > 0;
+  const featureList = (product.features || []).filter(Boolean);
+  const description = product.description || product.shortDescription || "Details will be updated soon.";
+  const terms = product.terms || "Warranty, rules, and product notes will be updated soon.";
+  const delivery = product.deliveryMethod || "Delivery details will be shared after admin approval.";
 
   return (
     <div className="min-h-screen">
@@ -71,13 +76,13 @@ function ProductDetailsPage() {
           <ArrowLeft className="h-4 w-4" /> Back to products
         </Link>
 
-        <div className="mt-6 grid gap-8 lg:grid-cols-[1fr_1.2fr]">
-          <div className="glass rounded-3xl p-8 text-center">
+        <div className="mt-6 grid gap-8 lg:grid-cols-[0.95fr_1.35fr]">
+          <div className="glass rounded-3xl p-8 text-center shadow-soft">
             <ProductLogo
               logoUrl={product.logoUrl}
               icon={product.icon}
               name={product.name}
-              className="mx-auto h-40 w-40 rounded-3xl bg-gradient-primary text-7xl shadow-glow"
+              className="mx-auto h-40 w-40 rounded-[2rem] bg-gradient-primary text-7xl shadow-glow"
               emojiClassName="text-7xl"
             />
 
@@ -86,56 +91,80 @@ function ProductDetailsPage() {
                 {product.badge}
               </div>
             )}
-            <h1 className="mt-4 text-2xl font-bold">{product.name}</h1>
+            <h1 className="mt-4 text-2xl font-bold text-slate-900">{product.name}</h1>
             <p className="mt-1 text-sm text-muted-foreground">{product.category}</p>
+
+            <div className="mt-6 rounded-2xl border border-white/70 bg-white/70 p-4 text-left">
+              <div className="flex items-baseline gap-3">
+                <span className="text-4xl font-bold text-gradient">{formatMoney(product.price, product.currency)}</span>
+                {product.originalPrice ? (
+                  <span className="text-base text-muted-foreground line-through">{formatMoney(product.originalPrice, product.currency)}</span>
+                ) : null}
+              </div>
+              <div className="mt-2 flex items-center gap-2 text-sm">
+                <span className={`h-2 w-2 rounded-full ${inStock ? "bg-success" : "bg-destructive"}`} />
+                <span className={inStock ? "text-success" : "text-destructive"}>
+                  {inStock ? `${product.stock} in stock — Available now` : "Out of stock"}
+                </span>
+              </div>
+            </div>
           </div>
 
-          <div>
-            <div className="flex items-baseline gap-3">
-              <span className="text-5xl font-bold text-gradient">{formatMoney(product.price, product.currency)}</span>
-              {product.originalPrice && (
-                <span className="text-lg text-muted-foreground line-through">{formatMoney(product.originalPrice, product.currency)}</span>
+          <div className="space-y-5">
+            <section className="glass rounded-3xl p-6 shadow-soft">
+              <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+                <FileText className="h-4 w-4 text-primary" /> Full Description
+              </div>
+              <p className="mt-3 whitespace-pre-line text-base leading-7 text-slate-700">{description}</p>
+            </section>
+
+            <section className="glass rounded-3xl p-6 shadow-soft">
+              <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+                <Sparkles className="h-4 w-4 text-primary" /> What's included
+              </div>
+              {featureList.length ? (
+                <ul className="mt-4 grid gap-3 sm:grid-cols-2">
+                  {featureList.map((feature) => (
+                    <li key={feature} className="flex items-start gap-2 rounded-2xl bg-white/65 p-3 text-sm text-slate-700">
+                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-success" />
+                      <span>{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <div className="mt-4 rounded-2xl bg-white/65 p-4 text-sm text-muted-foreground">Feature list will be updated soon.</div>
               )}
-            </div>
-            <div className="mt-2 flex items-center gap-2 text-sm">
-              <span className={`h-2 w-2 rounded-full ${inStock ? "bg-success" : "bg-destructive"}`} />
-              <span className={inStock ? "text-success" : "text-destructive"}>
-                {inStock ? `${product.stock} in stock — Available now` : "Out of stock"}
-              </span>
-            </div>
+            </section>
 
-            <p className="mt-6 text-muted-foreground">{product.description}</p>
-
-            <div className="mt-6">
-              <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">What's included</h3>
-              <ul className="mt-3 grid gap-2 sm:grid-cols-2">
-                {product.features.map((f) => (
-                  <li key={f} className="flex items-start gap-2 text-sm">
-                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-success" /> {f}
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            <div className="mt-6 grid gap-3 sm:grid-cols-2">
-              <div className="glass rounded-xl p-4">
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <Clock className="h-4 w-4 text-primary" /> Delivery
+            <div className="grid gap-4 sm:grid-cols-2">
+              <section className="glass rounded-3xl p-6 shadow-soft">
+                <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+                  <Clock className="h-4 w-4 text-primary" /> Delivery Method
                 </div>
-                <div className="mt-1 text-sm">{product.deliveryMethod}</div>
-              </div>
-              <div className="glass rounded-xl p-4">
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <ShieldCheck className="h-4 w-4 text-accent" /> Terms
+                <p className="mt-3 whitespace-pre-line text-sm leading-6 text-slate-700">{delivery}</p>
+              </section>
+              <section className="glass rounded-3xl p-6 shadow-soft">
+                <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+                  <ShieldCheck className="h-4 w-4 text-accent" /> Terms / Warranty
                 </div>
-                <div className="mt-1 text-sm">{product.terms}</div>
-              </div>
+                <p className="mt-3 whitespace-pre-line text-sm leading-6 text-slate-700">{terms}</p>
+              </section>
             </div>
 
-            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+            <section className="rounded-3xl border border-success/25 bg-success/10 p-5 text-sm text-success">
+              <div className="flex items-start gap-2">
+                <BadgeCheck className="mt-0.5 h-5 w-5 shrink-0" />
+                <div>
+                  <div className="font-semibold">Secure manual approval</div>
+                  <p className="mt-1 text-success/90">After payment confirmation, your account/instruction will unlock on the order status and track order pages.</p>
+                </div>
+              </div>
+            </section>
+
+            <div className="flex flex-col gap-3 sm:flex-row">
               <Link
                 to="/products"
-                className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-secondary px-6 py-3.5 text-sm font-semibold text-foreground transition hover:bg-secondary/70"
+                className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-white/75 px-6 py-3.5 text-sm font-semibold text-foreground ring-1 ring-border transition hover:bg-secondary/70"
               >
                 <ArrowLeft className="h-4 w-4" /> Back to Products
               </Link>
@@ -157,11 +186,6 @@ function ProductDetailsPage() {
                 </button>
               )}
             </div>
-            {!inStock && (
-              <p className="mt-3 text-center text-xs text-destructive">
-                This product is currently out of stock. Please check back soon.
-              </p>
-            )}
           </div>
         </div>
       </main>
