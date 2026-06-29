@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useRouterState } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { z } from "zod";
@@ -6,6 +6,7 @@ import { getProducts, getCategories } from "@/lib/api";
 import { SiteHeader, SiteFooter } from "@/components/site-header";
 import { ProductCard } from "@/components/product-card";
 import { ServerLoader } from "@/components/server-loader";
+import { ProductDetailsView } from "@/components/product-details-view";
 import { Search, PackageOpen } from "lucide-react";
 
 const search = z.object({
@@ -26,7 +27,18 @@ export const Route = createFileRoute("/products")({
   component: ProductsPage,
 });
 
+function sortProductsForDisplay<T extends { sortOrder?: number; name: string }>(list: T[]) {
+  return [...list].sort((a, b) => {
+    const aOrder = Number(a.sortOrder);
+    const bOrder = Number(b.sortOrder);
+    const av = aOrder > 0 ? aOrder : 999999;
+    const bv = bOrder > 0 ? bOrder : 999999;
+    return av - bv || a.name.localeCompare(b.name);
+  });
+}
+
 function ProductsPage() {
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
   const sp = Route.useSearch();
   const navigate = Route.useNavigate();
   const [q, setQ] = useState(sp.q ?? "");
@@ -36,13 +48,26 @@ function ProductsPage() {
   const { data: categories } = useQuery({ queryKey: ["categories"], queryFn: getCategories });
 
   const filtered = useMemo(() => {
-    const list = products ?? [];
+    const list = sortProductsForDisplay(products ?? []);
     return list.filter((p) => {
       const matchCat = selected === "all" || p.category === selected;
       const matchQ = q.trim() === "" || p.name.toLowerCase().includes(q.toLowerCase()) || p.category.toLowerCase().includes(q.toLowerCase());
       return matchCat && matchQ;
     });
   }, [products, selected, q]);
+
+  const detailMatch = pathname.match(/^\/products\/([^/?#]+)\/?$/);
+  const detailId = detailMatch?.[1] ? decodeURIComponent(detailMatch[1]) : null;
+
+  if (detailId) {
+    return (
+      <div className="min-h-screen">
+        <SiteHeader />
+        <ProductDetailsView productId={detailId} />
+        <SiteFooter />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen">

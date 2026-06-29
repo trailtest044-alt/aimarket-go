@@ -19,6 +19,16 @@ export const Route = createFileRoute("/")({
   component: HomePage,
 });
 
+function sortProductsForDisplay<T extends { sortOrder?: number; name: string }>(list: T[]) {
+  return [...list].sort((a, b) => {
+    const aOrder = Number(a.sortOrder);
+    const bOrder = Number(b.sortOrder);
+    const av = aOrder > 0 ? aOrder : 999999;
+    const bv = bOrder > 0 ? bOrder : 999999;
+    return av - bv || a.name.localeCompare(b.name);
+  });
+}
+
 function HomePage() {
   const { data: products, isLoading } = useQuery({ queryKey: ["products"], queryFn: getProducts });
   const { data: categories } = useQuery({ queryKey: ["categories"], queryFn: getCategories });
@@ -26,7 +36,7 @@ function HomePage() {
   const [selected, setSelected] = useState("all");
 
   const filtered = useMemo(() => {
-    const list = products ?? [];
+    const list = sortProductsForDisplay(products ?? []);
     return list.filter((p) => {
       const matchCat = selected === "all" || p.category === selected;
       const matchQ =

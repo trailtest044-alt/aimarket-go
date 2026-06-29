@@ -31,8 +31,19 @@ const empty: Product = {
   sortOrder: 0,
 };
 
+function effectiveDisplayOrder(product: Product, index: number) {
+  const order = Number(product.sortOrder);
+  return order > 0 ? order : index + 1;
+}
+
 function sortProducts(products: Product[]) {
-  return [...products].sort((a, b) => Number(a.sortOrder ?? 9999) - Number(b.sortOrder ?? 9999) || a.name.localeCompare(b.name));
+  return [...products].sort((a, b) => {
+    const aOrder = Number(a.sortOrder);
+    const bOrder = Number(b.sortOrder);
+    const av = aOrder > 0 ? aOrder : 999999;
+    const bv = bOrder > 0 ? bOrder : 999999;
+    return av - bv || a.name.localeCompare(b.name);
+  });
 }
 
 function AdminProductsPage() {
@@ -51,20 +62,20 @@ function AdminProductsPage() {
   }
 
   async function moveProduct(product: Product, direction: "up" | "down") {
-    const index = sorted.findIndex((x) => x.id === product.id);
-    const target = direction === "up" ? sorted[index - 1] : sorted[index + 1];
-    if (!target) return;
-    const productOrder = Number(product.sortOrder ?? index + 1);
-    const targetOrder = Number(target.sortOrder ?? (direction === "up" ? index : index + 2));
-    await Promise.all([
-      updateProduct({ ...product, sortOrder: targetOrder }),
-      updateProduct({ ...target, sortOrder: productOrder }),
-    ]);
+    const normalized = sorted.map((item, index) => ({ ...item, sortOrder: index + 1 }));
+    const index = normalized.findIndex((x) => x.id === product.id);
+    const targetIndex = direction === "up" ? index - 1 : index + 1;
+    if (index < 0 || targetIndex < 0 || targetIndex >= normalized.length) return;
+
+    const next = [...normalized];
+    [next[index], next[targetIndex]] = [next[targetIndex], next[index]];
+
+    await Promise.all(next.map((item, nextIndex) => updateProduct({ ...item, sortOrder: nextIndex + 1 })));
     qc.invalidateQueries({ queryKey: ["products"] });
     toast.success("Display order updated");
   }
 
-  const nextSortOrder = sorted.length ? Math.max(...sorted.map((p) => Number(p.sortOrder ?? 0))) + 1 : 1;
+  const nextSortOrder = sorted.length ? Math.max(...sorted.map((p, index) => effectiveDisplayOrder(p, index))) + 1 : 1;
 
   return (
     <AdminShell title="Products">
@@ -104,7 +115,7 @@ function AdminProductsPage() {
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       <GripVertical className="h-4 w-4 text-muted-foreground" />
-                      <span className="rounded-full bg-secondary px-2 py-1 text-xs font-semibold">#{Number(p.sortOrder ?? index + 1)}</span>
+                      <span className="rounded-full bg-secondary px-2 py-1 text-xs font-semibold">#{effectiveDisplayOrder(p, index)}</span>
                       <div className="flex flex-col">
                         <button disabled={index === 0} onClick={() => moveProduct(p, "up")} className="rounded-md p-1 hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-30" title="Move up"><ArrowUp className="h-3.5 w-3.5" /></button>
                         <button disabled={index === sorted.length - 1} onClick={() => moveProduct(p, "down")} className="rounded-md p-1 hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-30" title="Move down"><ArrowDown className="h-3.5 w-3.5" /></button>
