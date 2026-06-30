@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { AdminShell } from "@/components/admin-shell";
 import { ProductLogo } from "@/components/product-logo";
 import { ServerLoader } from "@/components/server-loader";
-import { getProducts, createProduct, updateProduct, updateProductFields, deleteProduct, formatMoney } from "@/lib/api";
+import { createProduct, deleteProduct, formatMoney, getProducts, reorderProducts, updateProduct } from "@/lib/api";
 import type { Product } from "@/lib/mock-data";
 
 export const Route = createFileRoute("/admin/products")({ component: AdminProductsPage });
@@ -31,96 +31,91 @@ const empty: Product = {
   sortOrder: 0,
 };
 
-function effectiveDisplayOrder(product: Product, index: number) {
-  const order = Number(product.sortOrder);
-  return order > 0 ? order : index + 1;
+function sortedProducts(products: Product[]) {
+  return [...products].sort((a, b) => {
+    const ao = Number(a.sortOrder || 0);
+    const bo = Number(b.sortOrder || 0);
+    if (ao > 0 && bo > 0 && ao !== bo) return ao - bo;
+    if (ao > 0 && bo <= 0) return -1;
+    if (ao <= 0 && bo > 0) return 1;
+    return a.name.localeCompare(b.name);
+  });
 }
 
 function normalizeOrder(products: Product[]) {
-  const sorted = [...products].sort((a, b) => {
-    const ao = Number(a.sortOrder);
-    const bo = Number(b.sortOrder);
-    const av = ao > 0 ? ao : 999999;
-    const bv = bo > 0 ? bo : 999999;
-    return av - bv || new Date((a as any).createdAt || 0).getTime() - new Date((b as any).createdAt || 0).getTime() || a.name.localeCompare(b.name);
-  });
-  return sorted.map((item, index) => ({ ...item, sortOrder: index + 1 }));
+  return sortedProducts(products).map((product, index) => ({ ...product, sortOrder: index + 1 }));
 }
 
 function AdminProductsPage() {
   const qc = useQueryClient();
-  const { data: products = [], isLoading, isFetching } = useQuery({ queryKey: ["products"], queryFn: getProducts });
+  const { data: products = [], isLoading, refetch } = useQuery({ queryKey: ["products"], queryFn: getProducts });
+  const [localProducts, setLocalProducts] = useState<Product[]>([]);
   const [editing, setEditing] = useState<Product | null>(null);
-  const [orderedProducts, setOrderedProducts] = useState<Product[]>([]);
   const [savingOrder, setSavingOrder] = useState(false);
 
-  const normalizedFromServer = useMemo(() => normalizeOrder(products), [products]);
-
   useEffect(() => {
-    setOrderedProducts(normalizedFromServer);
-  }, [normalizedFromServer]);
+    setLocalProducts(normalizeOrder(products));
+  }, [products]);
 
-  async function saveProduct(product: Product) {
-    const existing = products.some((x) => x.id === product.id);
-    const cleaned = { ...product, sortOrder: Number(product.sortOrder) || (existing ? effectiveDisplayOrder(product, 0) : orderedProducts.length + 1) };
-    if (existing) await updateProduct(cleaned);
-    else await createProduct(cleaned);
-    await qc.invalidateQueries({ queryKey: ["products"] });
-    toast.success(existing ? "Product updated" : "Product created");
-    setEditing(null);
-  }
+  const orderedProducts = useMemo(() => normalizeOrder(localProducts), [localProducts]);
 
-  async function persistOrder(nextProducts: Product[]) {
+  const persistOrder = async (nextProducts: Product[], successMessage = "Display order saved") => {
+    const normalized = normalizeOrder(nextProducts);
+    const previous = localProducts;
+    setLocalProducts(normalized);
     setSavingOrder(true);
-    setOrderedProducts(nextProducts);
-    qc.setQueryData<Product[]>(["products"], (old = []) => {
-      const byId = new Map(nextProducts.map((item) => [item.id, item]));
-      const merged = old.map((item) => byId.get(item.id) || item);
-      const missing = nextProducts.filter((item) => !old.some((x) => x.id === item.id));
-      return normalizeOrder([...merged, ...missing]);
-    });
     try {
-      await Promise.all(nextProducts.map((item, index) => updateProductFields(item.backendId || item.id, { sortOrder: index + 1 })));
+      const saved = await reorderProducts(normalized.map((product, index) => ({ id: product.backendId || product.id, sortOrder: index + 1 })));
+      const finalProducts = normalizeOrder(saved.length ? saved : normalized);
+      setLocalProducts(finalProducts);
+      qc.setQueryData(["products"], finalProducts);
       await qc.invalidateQueries({ queryKey: ["products"] });
-      toast.success("Display order updated");
-    } catch (error) {
-      setOrderedProducts(normalizedFromServer);
-      await qc.invalidateQueries({ queryKey: ["products"] });
-      toast.error(error instanceof Error ? error.message : "Could not update display order");
+      toast.success(successMessage);
+    } catch (err) {
+      setLocalProducts(previous);
+      toast.error(err instanceof Error ? err.message : "Could not save display order");
     } finally {
       setSavingOrder(false);
     }
-  }
+  };
 
-  async function moveProduct(product: Product, direction: "up" | "down") {
-    const index = orderedProducts.findIndex((x) => x.id === product.id);
+  const moveProduct = async (index: number, direction: "up" | "down") => {
+    const current = normalizeOrder(localProducts);
     const targetIndex = direction === "up" ? index - 1 : index + 1;
-    if (index < 0 || targetIndex < 0 || targetIndex >= orderedProducts.length) return;
-
-    const next = [...orderedProducts];
+    if (targetIndex < 0 || targetIndex >= current.length) return;
+    const next = [...current];
     [next[index], next[targetIndex]] = [next[targetIndex], next[index]];
-    await persistOrder(next.map((item, nextIndex) => ({ ...item, sortOrder: nextIndex + 1 })));
-  }
+    await persistOrder(next, "Product order updated");
+  };
 
-  const nextSortOrder = orderedProducts.length ? Math.max(...orderedProducts.map((p, index) => effectiveDisplayOrder(p, index))) + 1 : 1;
+  const saveProduct = async (product: Product) => {
+    const existing = products.some((x) => x.id === product.id || x.backendId === product.backendId);
+    const nextOrder = Number(product.sortOrder || 0) || (existing ? orderedProducts.findIndex((x) => x.id === product.id) + 1 : orderedProducts.length + 1);
+    const payload = { ...product, sortOrder: nextOrder, price: product.priceUSDT, currency: product.worldwideCurrency };
+    if (existing) await updateProduct(payload);
+    else await createProduct(payload);
+    await qc.invalidateQueries({ queryKey: ["products"] });
+    toast.success(existing ? "Product updated" : "Product created");
+    setEditing(null);
+  };
 
   return (
     <AdminShell title="Products">
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="rounded-2xl border border-primary/15 bg-white/60 px-4 py-3 text-xs text-muted-foreground">
-          Use <span className="font-semibold text-foreground">Display Order</span> to decide which product appears first on the website. Smaller number shows first. Changes appear instantly here.
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="rounded-2xl bg-white/55 px-4 py-3 text-sm text-muted-foreground ring-1 ring-border">
+          Use <b>Display Order</b> or the arrows to decide which product appears first. Smaller number shows first.
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex gap-2">
           <button
-            onClick={async () => persistOrder(normalizeOrder(orderedProducts))}
             disabled={savingOrder || orderedProducts.length === 0}
-            className="inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-white/70 px-4 py-2 text-sm font-semibold hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-50"
+            onClick={() => persistOrder(orderedProducts, "Display order normalized")}
+            className="inline-flex items-center gap-2 rounded-xl border border-border bg-white/70 px-4 py-2 text-sm font-semibold hover:bg-white disabled:opacity-50"
           >
-            <RefreshCw className={`h-4 w-4 ${savingOrder || isFetching ? "animate-spin" : ""}`} /> Normalize order
+            <RefreshCw className={`h-4 w-4 ${savingOrder ? "animate-spin" : ""}`} /> Normalize order
           </button>
           <button
-            onClick={() => setEditing({ ...empty, id: `prod-${Date.now()}`, sortOrder: nextSortOrder })}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-glow"
+            onClick={() => setEditing({ ...empty, id: `prod-${Date.now()}`, sortOrder: orderedProducts.length + 1 })}
+            className="inline-flex items-center gap-2 rounded-xl bg-gradient-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-glow"
           >
             <Plus className="h-4 w-4" /> Add Product
           </button>
@@ -128,7 +123,7 @@ function AdminProductsPage() {
       </div>
 
       {isLoading ? (
-        <ServerLoader compact title="Please wait, server loading..." message="Loading products and display order." />
+        <ServerLoader compact title="Please wait, server loading..." message="Our little AI assistant is loading products and display order." />
       ) : orderedProducts.length === 0 ? (
         <div className="glass rounded-3xl py-16 text-center text-sm text-muted-foreground">No products. Add your first product manually.</div>
       ) : (
@@ -147,14 +142,14 @@ function AdminProductsPage() {
             </thead>
             <tbody>
               {orderedProducts.map((p, index) => (
-                <tr key={p.id} className="border-t border-border transition-colors hover:bg-white/40">
+                <tr key={p.backendId || p.id} className="border-t border-border transition-colors hover:bg-white/40">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       <GripVertical className="h-4 w-4 text-muted-foreground" />
                       <span className="rounded-full bg-secondary px-2 py-1 text-xs font-semibold">#{index + 1}</span>
                       <div className="flex flex-col">
-                        <button disabled={index === 0 || savingOrder} onClick={() => moveProduct(p, "up")} className="rounded-md p-1 hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-30" title="Move up"><ArrowUp className="h-3.5 w-3.5" /></button>
-                        <button disabled={index === orderedProducts.length - 1 || savingOrder} onClick={() => moveProduct(p, "down")} className="rounded-md p-1 hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-30" title="Move down"><ArrowDown className="h-3.5 w-3.5" /></button>
+                        <button disabled={index === 0 || savingOrder} onClick={() => moveProduct(index, "up")} className="rounded-md p-1 hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-30" title="Move up"><ArrowUp className="h-3.5 w-3.5" /></button>
+                        <button disabled={index === orderedProducts.length - 1 || savingOrder} onClick={() => moveProduct(index, "down")} className="rounded-md p-1 hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-30" title="Move down"><ArrowDown className="h-3.5 w-3.5" /></button>
                       </div>
                     </div>
                   </td>
@@ -185,6 +180,7 @@ function AdminProductsPage() {
                         onClick={async () => {
                           await deleteProduct(p.id);
                           await qc.invalidateQueries({ queryKey: ["products"] });
+                          await refetch();
                           toast.success("Product deleted");
                         }}
                         className="rounded-lg p-2 text-destructive hover:bg-destructive/10"
@@ -201,7 +197,7 @@ function AdminProductsPage() {
         </div>
       )}
 
-      {editing && <EditModal product={editing} existing={products.some((p) => p.id === editing.id)} onClose={() => setEditing(null)} onSave={saveProduct} />}
+      {editing && <EditModal product={editing} existing={products.some((p) => p.id === editing.id || p.backendId === editing.backendId)} onClose={() => setEditing(null)} onSave={saveProduct} />}
     </AdminShell>
   );
 }

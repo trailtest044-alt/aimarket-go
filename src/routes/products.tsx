@@ -5,6 +5,7 @@ import { z } from "zod";
 import { getProducts, getCategories } from "@/lib/api";
 import { SiteHeader, SiteFooter } from "@/components/site-header";
 import { ProductCard } from "@/components/product-card";
+import { ServerLoader } from "@/components/server-loader";
 import { Search, PackageOpen } from "lucide-react";
 
 const search = z.object({
@@ -25,16 +26,6 @@ export const Route = createFileRoute("/products")({
   component: ProductsPage,
 });
 
-function sortForDisplay<T extends { sortOrder?: number; name?: string }>(items: T[]) {
-  return [...items].sort((a, b) => {
-    const ao = Number(a.sortOrder);
-    const bo = Number(b.sortOrder);
-    const av = ao > 0 ? ao : 999999;
-    const bv = bo > 0 ? bo : 999999;
-    return av - bv || String(a.name || "").localeCompare(String(b.name || ""));
-  });
-}
-
 function ProductsPage() {
   const sp = Route.useSearch();
   const navigate = Route.useNavigate();
@@ -45,7 +36,7 @@ function ProductsPage() {
   const { data: categories } = useQuery({ queryKey: ["categories"], queryFn: getCategories });
 
   const filtered = useMemo(() => {
-    const list = sortForDisplay(products ?? []);
+    const list = products ?? [];
     return list.filter((p) => {
       const matchCat = selected === "all" || p.category === selected;
       const matchQ = q.trim() === "" || p.name.toLowerCase().includes(q.toLowerCase()) || p.category.toLowerCase().includes(q.toLowerCase());
@@ -100,11 +91,7 @@ function ProductsPage() {
         {/* Grid */}
         <div className="mt-8">
           {isLoading ? (
-            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="h-72 animate-pulse rounded-2xl bg-secondary/40" />
-              ))}
-            </div>
+            <ServerLoader title="Please wait, server loading..." message="Our little AI assistant is arranging the products." />
           ) : filtered.length === 0 ? (
             <div className="glass rounded-2xl py-16 text-center">
               <PackageOpen className="mx-auto h-10 w-10 text-muted-foreground" />
