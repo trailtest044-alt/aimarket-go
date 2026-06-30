@@ -1,11 +1,10 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Outlet, useRouterState } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { z } from "zod";
 import { getProducts, getCategories } from "@/lib/api";
 import { SiteHeader, SiteFooter } from "@/components/site-header";
 import { ProductCard } from "@/components/product-card";
-import { ServerLoader } from "@/components/server-loader";
 import { Search, PackageOpen } from "lucide-react";
 
 const search = z.object({
@@ -27,6 +26,8 @@ export const Route = createFileRoute("/products")({
 });
 
 function ProductsPage() {
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
+  if (pathname !== "/products") return <Outlet />;
   const sp = Route.useSearch();
   const navigate = Route.useNavigate();
   const [q, setQ] = useState(sp.q ?? "");
@@ -91,7 +92,11 @@ function ProductsPage() {
         {/* Grid */}
         <div className="mt-8">
           {isLoading ? (
-            <ServerLoader title="Please wait, server loading..." message="Our little AI assistant is arranging the products." />
+            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="h-72 animate-pulse rounded-2xl bg-secondary/40" />
+              ))}
+            </div>
           ) : filtered.length === 0 ? (
             <div className="glass rounded-2xl py-16 text-center">
               <PackageOpen className="mx-auto h-10 w-10 text-muted-foreground" />
