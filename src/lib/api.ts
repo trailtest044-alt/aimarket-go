@@ -130,7 +130,6 @@ function productToFrontend(p: BackendProduct): Product {
     deliveryMethod: p.deliveryMethod || "Account login details will be delivered after admin approval.",
     terms: p.terms || "Do not change password/recovery info unless instructed by admin.",
     stock: money(p.availableStock ?? 0),
-    sortOrder: money(p.sortOrder ?? 0),
     addedBy: p.createdByNickname || "",
     updatedBy: p.updatedByNickname || "",
   };
@@ -143,7 +142,7 @@ function productToBackend(p: Product) {
     imageUrl: p.logoUrl || "", badge: p.badge || "", icon: p.icon || "✨",
     priceBDT: money(p.priceBDT), pricePKR: money(p.pricePKR), priceUSDT: money(p.priceUSDT), worldwideCurrency: p.worldwideCurrency || "USDT",
     originalPriceBDT: money(p.originalPriceBDT), originalPricePKR: money(p.originalPricePKR), originalPriceUSDT: money(p.originalPriceUSDT),
-    features: p.features || [], deliveryMethod: p.deliveryMethod || "", terms: p.terms || "", isActive: true, sortOrder: money(p.sortOrder ?? 0),
+    features: p.features || [], deliveryMethod: p.deliveryMethod || "", terms: p.terms || "", isActive: true, sortOrder: 0,
   };
 }
 function getAccount(method: BackendPaymentMethod | undefined, labelIncludes: string) { return method?.accounts?.find((a) => (a.label || "").toLowerCase().includes(labelIncludes))?.value || ""; }
@@ -192,7 +191,36 @@ export async function getVisitorRegion(): Promise<{ region: PriceRegion; country
 export async function getProducts(): Promise<Product[]> { if (IS_MOCK_MODE) return delay(load(STORAGE_KEYS.products, mockProducts)); const region = (await getVisitorRegion()).region; const data = await http<{ products: BackendProduct[] }>(`/products?region=${region}`); return data.products.map(productToFrontend); }
 export async function getProductById(id: string): Promise<Product | null> { if (IS_MOCK_MODE) { const list = await getProducts(); return list.find((p) => p.id === id || p.backendId === id) ?? null; } try { const region = (await getVisitorRegion()).region; if (objectIdRe.test(id)) { const list = await getProducts(); return list.find((p) => p.backendId === id) ?? null; } const data = await http<{ product: BackendProduct }>(`/products/${id}?region=${region}`); return productToFrontend(data.product); } catch { return null; } }
 export async function createProduct(p: Product): Promise<Product> { if (IS_MOCK_MODE) { const list = await getProducts(); save(STORAGE_KEYS.products, [p, ...list]); return delay(p); } const data = await http<{ product: BackendProduct }>("/admin/products", { method: "POST", body: JSON.stringify(productToBackend(p)) }); return productToFrontend(data.product); }
-export async function updateProduct(p: Product): Promise<Product> { if (IS_MOCK_MODE) { const list = await getProducts(); save(STORAGE_KEYS.products, list.map((x) => (x.id === p.id ? p : x))); return delay(p); } const backendId = p.backendId || (await resolveBackendProductId(p.id)); const data = await http<{ product: BackendProduct }>(`/admin/products/${backendId}`, { method: "PATCH", body: JSON.stringify(productToBackend(p)) }); return productToFrontend(data.product); }
+export async function updateProduct(p: Product): Promise<Product> {
+  if (IS_MOCK_MODE) {
+    const list = await getProducts();
+    save(STORAGE_KEYS.products, list.map((x) => (x.id === p.id ? p : x)));
+    return delay(p);
+  }
+  const backendId = p.backendId || (await resolveBackendProductId(p.id));
+  const data = await http<{ product: BackendProduct }>(`/admin/products/${backendId}`, {
+    method: "PATCH",
+    body: JSON.stringify(productToBackend(p)),
+  });
+  return productToFrontend(data.product);
+}
+
+export async function updateProductFields(id: string, fields: Partial<Pick<Product, "sortOrder">>): Promise<Product> {
+  if (IS_MOCK_MODE) {
+    const list = await getProducts();
+    const updated = list.map((x) => (x.id === id ? { ...x, ...fields } : x));
+    save(STORAGE_KEYS.products, updated);
+    return delay(updated.find((x) => x.id === id) || list[0]);
+  }
+  const backendId = objectIdRe.test(id) ? id : await resolveBackendProductId(id);
+  const payload: Record<string, unknown> = {};
+  if (fields.sortOrder !== undefined) payload.sortOrder = money(fields.sortOrder);
+  const data = await http<{ product: BackendProduct }>(`/admin/products/${backendId}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+  return productToFrontend(data.product);
+}
 export async function deleteProduct(id: string): Promise<void> { if (IS_MOCK_MODE) { const list = await getProducts(); save(STORAGE_KEYS.products, list.filter((x) => x.id !== id)); return delay(undefined); } const backendId = await resolveBackendProductId(id); await http<void>(`/admin/products/${backendId}`, { method: "DELETE" }); }
 export async function getCategories(): Promise<typeof mockCategories> { if (IS_MOCK_MODE) return delay(mockCategories); const products = await getProducts(); const categories = Array.from(new Set(products.map((p) => p.category).filter(Boolean))); return [{ id: "all", name: "All Products", icon: "🌐" }, ...categories.map((name) => ({ id: name, name, icon: "✨" }))]; }
 

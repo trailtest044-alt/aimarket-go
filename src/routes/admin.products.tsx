@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { AdminShell } from "@/components/admin-shell";
 import { ProductLogo } from "@/components/product-logo";
 import { ServerLoader } from "@/components/server-loader";
-import { getProducts, createProduct, updateProduct, deleteProduct, formatMoney } from "@/lib/api";
+import { getProducts, createProduct, updateProduct, updateProductFields, deleteProduct, formatMoney } from "@/lib/api";
 import type { Product } from "@/lib/mock-data";
 
 export const Route = createFileRoute("/admin/products")({ component: AdminProductsPage });
@@ -80,7 +80,7 @@ function AdminProductsPage() {
       return normalizeOrder([...merged, ...missing]);
     });
     try {
-      await Promise.all(nextProducts.map((item, index) => updateProduct({ ...item, sortOrder: index + 1 })));
+      await Promise.all(nextProducts.map((item, index) => updateProductFields(item.backendId || item.id, { sortOrder: index + 1 })));
       await qc.invalidateQueries({ queryKey: ["products"] });
       toast.success("Display order updated");
     } catch (error) {
