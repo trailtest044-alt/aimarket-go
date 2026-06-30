@@ -1,12 +1,10 @@
-import { createFileRoute, useRouterState } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { z } from "zod";
 import { getProducts, getCategories } from "@/lib/api";
 import { SiteHeader, SiteFooter } from "@/components/site-header";
 import { ProductCard } from "@/components/product-card";
-import { ServerLoader } from "@/components/server-loader";
-import { ProductDetailsView } from "@/components/product-details-view";
 import { Search, PackageOpen } from "lucide-react";
 
 const search = z.object({
@@ -27,18 +25,17 @@ export const Route = createFileRoute("/products")({
   component: ProductsPage,
 });
 
-function sortProductsForDisplay<T extends { sortOrder?: number; name: string }>(list: T[]) {
-  return [...list].sort((a, b) => {
-    const aOrder = Number(a.sortOrder);
-    const bOrder = Number(b.sortOrder);
-    const av = aOrder > 0 ? aOrder : 999999;
-    const bv = bOrder > 0 ? bOrder : 999999;
-    return av - bv || a.name.localeCompare(b.name);
+function sortForDisplay<T extends { sortOrder?: number; name?: string }>(items: T[]) {
+  return [...items].sort((a, b) => {
+    const ao = Number(a.sortOrder);
+    const bo = Number(b.sortOrder);
+    const av = ao > 0 ? ao : 999999;
+    const bv = bo > 0 ? bo : 999999;
+    return av - bv || String(a.name || "").localeCompare(String(b.name || ""));
   });
 }
 
 function ProductsPage() {
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
   const sp = Route.useSearch();
   const navigate = Route.useNavigate();
   const [q, setQ] = useState(sp.q ?? "");
@@ -48,26 +45,13 @@ function ProductsPage() {
   const { data: categories } = useQuery({ queryKey: ["categories"], queryFn: getCategories });
 
   const filtered = useMemo(() => {
-    const list = sortProductsForDisplay(products ?? []);
+    const list = sortForDisplay(products ?? []);
     return list.filter((p) => {
       const matchCat = selected === "all" || p.category === selected;
       const matchQ = q.trim() === "" || p.name.toLowerCase().includes(q.toLowerCase()) || p.category.toLowerCase().includes(q.toLowerCase());
       return matchCat && matchQ;
     });
   }, [products, selected, q]);
-
-  const detailMatch = pathname.match(/^\/products\/([^/?#]+)\/?$/);
-  const detailId = detailMatch?.[1] ? decodeURIComponent(detailMatch[1]) : null;
-
-  if (detailId) {
-    return (
-      <div className="min-h-screen">
-        <SiteHeader />
-        <ProductDetailsView productId={detailId} />
-        <SiteFooter />
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen">
@@ -116,7 +100,11 @@ function ProductsPage() {
         {/* Grid */}
         <div className="mt-8">
           {isLoading ? (
-            <ServerLoader title="Please wait, server loading..." message="Loading all products and live stock." />
+            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="h-72 animate-pulse rounded-2xl bg-secondary/40" />
+              ))}
+            </div>
           ) : filtered.length === 0 ? (
             <div className="glass rounded-2xl py-16 text-center">
               <PackageOpen className="mx-auto h-10 w-10 text-muted-foreground" />

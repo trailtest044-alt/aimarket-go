@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
-import { ArrowDown, ArrowUp, GripVertical, Pencil, Plus, Trash2, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { ArrowDown, ArrowUp, GripVertical, Pencil, Plus, RefreshCw, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { AdminShell } from "@/components/admin-shell";
 import { ProductLogo } from "@/components/product-logo";
@@ -36,64 +36,100 @@ function effectiveDisplayOrder(product: Product, index: number) {
   return order > 0 ? order : index + 1;
 }
 
-function sortProducts(products: Product[]) {
-  return [...products].sort((a, b) => {
-    const aOrder = Number(a.sortOrder);
-    const bOrder = Number(b.sortOrder);
-    const av = aOrder > 0 ? aOrder : 999999;
-    const bv = bOrder > 0 ? bOrder : 999999;
-    return av - bv || a.name.localeCompare(b.name);
+function normalizeOrder(products: Product[]) {
+  const sorted = [...products].sort((a, b) => {
+    const ao = Number(a.sortOrder);
+    const bo = Number(b.sortOrder);
+    const av = ao > 0 ? ao : 999999;
+    const bv = bo > 0 ? bo : 999999;
+    return av - bv || new Date((a as any).createdAt || 0).getTime() - new Date((b as any).createdAt || 0).getTime() || a.name.localeCompare(b.name);
   });
+  return sorted.map((item, index) => ({ ...item, sortOrder: index + 1 }));
 }
 
 function AdminProductsPage() {
   const qc = useQueryClient();
-  const { data: products = [], isLoading } = useQuery({ queryKey: ["products"], queryFn: getProducts });
+  const { data: products = [], isLoading, isFetching } = useQuery({ queryKey: ["products"], queryFn: getProducts });
   const [editing, setEditing] = useState<Product | null>(null);
-  const sorted = useMemo(() => sortProducts(products), [products]);
+  const [orderedProducts, setOrderedProducts] = useState<Product[]>([]);
+  const [savingOrder, setSavingOrder] = useState(false);
+
+  const normalizedFromServer = useMemo(() => normalizeOrder(products), [products]);
+
+  useEffect(() => {
+    setOrderedProducts(normalizedFromServer);
+  }, [normalizedFromServer]);
 
   async function saveProduct(product: Product) {
     const existing = products.some((x) => x.id === product.id);
-    if (existing) await updateProduct(product);
-    else await createProduct(product);
-    qc.invalidateQueries({ queryKey: ["products"] });
+    const cleaned = { ...product, sortOrder: Number(product.sortOrder) || (existing ? effectiveDisplayOrder(product, 0) : orderedProducts.length + 1) };
+    if (existing) await updateProduct(cleaned);
+    else await createProduct(cleaned);
+    await qc.invalidateQueries({ queryKey: ["products"] });
     toast.success(existing ? "Product updated" : "Product created");
     setEditing(null);
   }
 
-  async function moveProduct(product: Product, direction: "up" | "down") {
-    const normalized = sorted.map((item, index) => ({ ...item, sortOrder: index + 1 }));
-    const index = normalized.findIndex((x) => x.id === product.id);
-    const targetIndex = direction === "up" ? index - 1 : index + 1;
-    if (index < 0 || targetIndex < 0 || targetIndex >= normalized.length) return;
-
-    const next = [...normalized];
-    [next[index], next[targetIndex]] = [next[targetIndex], next[index]];
-
-    await Promise.all(next.map((item, nextIndex) => updateProduct({ ...item, sortOrder: nextIndex + 1 })));
-    qc.invalidateQueries({ queryKey: ["products"] });
-    toast.success("Display order updated");
+  async function persistOrder(nextProducts: Product[]) {
+    setSavingOrder(true);
+    setOrderedProducts(nextProducts);
+    qc.setQueryData<Product[]>(["products"], (old = []) => {
+      const byId = new Map(nextProducts.map((item) => [item.id, item]));
+      const merged = old.map((item) => byId.get(item.id) || item);
+      const missing = nextProducts.filter((item) => !old.some((x) => x.id === item.id));
+      return normalizeOrder([...merged, ...missing]);
+    });
+    try {
+      await Promise.all(nextProducts.map((item, index) => updateProduct({ ...item, sortOrder: index + 1 })));
+      await qc.invalidateQueries({ queryKey: ["products"] });
+      toast.success("Display order updated");
+    } catch (error) {
+      setOrderedProducts(normalizedFromServer);
+      await qc.invalidateQueries({ queryKey: ["products"] });
+      toast.error(error instanceof Error ? error.message : "Could not update display order");
+    } finally {
+      setSavingOrder(false);
+    }
   }
 
-  const nextSortOrder = sorted.length ? Math.max(...sorted.map((p, index) => effectiveDisplayOrder(p, index))) + 1 : 1;
+  async function moveProduct(product: Product, direction: "up" | "down") {
+    const index = orderedProducts.findIndex((x) => x.id === product.id);
+    const targetIndex = direction === "up" ? index - 1 : index + 1;
+    if (index < 0 || targetIndex < 0 || targetIndex >= orderedProducts.length) return;
+
+    const next = [...orderedProducts];
+    [next[index], next[targetIndex]] = [next[targetIndex], next[index]];
+    await persistOrder(next.map((item, nextIndex) => ({ ...item, sortOrder: nextIndex + 1 })));
+  }
+
+  const nextSortOrder = orderedProducts.length ? Math.max(...orderedProducts.map((p, index) => effectiveDisplayOrder(p, index))) + 1 : 1;
 
   return (
     <AdminShell title="Products">
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="rounded-2xl border border-primary/15 bg-white/60 px-4 py-3 text-xs text-muted-foreground">
-          Use <span className="font-semibold text-foreground">Display Order</span> to decide which product appears first on the website. Smaller number shows first.
+          Use <span className="font-semibold text-foreground">Display Order</span> to decide which product appears first on the website. Smaller number shows first. Changes appear instantly here.
         </div>
-        <button
-          onClick={() => setEditing({ ...empty, id: `prod-${Date.now()}`, sortOrder: nextSortOrder })}
-          className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-glow"
-        >
-          <Plus className="h-4 w-4" /> Add Product
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={async () => persistOrder(normalizeOrder(orderedProducts))}
+            disabled={savingOrder || orderedProducts.length === 0}
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-white/70 px-4 py-2 text-sm font-semibold hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <RefreshCw className={`h-4 w-4 ${savingOrder || isFetching ? "animate-spin" : ""}`} /> Normalize order
+          </button>
+          <button
+            onClick={() => setEditing({ ...empty, id: `prod-${Date.now()}`, sortOrder: nextSortOrder })}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-glow"
+          >
+            <Plus className="h-4 w-4" /> Add Product
+          </button>
+        </div>
       </div>
 
       {isLoading ? (
         <ServerLoader compact title="Please wait, server loading..." message="Loading products and display order." />
-      ) : sorted.length === 0 ? (
+      ) : orderedProducts.length === 0 ? (
         <div className="glass rounded-3xl py-16 text-center text-sm text-muted-foreground">No products. Add your first product manually.</div>
       ) : (
         <div className="glass overflow-x-auto rounded-3xl">
@@ -110,15 +146,15 @@ function AdminProductsPage() {
               </tr>
             </thead>
             <tbody>
-              {sorted.map((p, index) => (
-                <tr key={p.id} className="border-t border-border">
+              {orderedProducts.map((p, index) => (
+                <tr key={p.id} className="border-t border-border transition-colors hover:bg-white/40">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       <GripVertical className="h-4 w-4 text-muted-foreground" />
-                      <span className="rounded-full bg-secondary px-2 py-1 text-xs font-semibold">#{effectiveDisplayOrder(p, index)}</span>
+                      <span className="rounded-full bg-secondary px-2 py-1 text-xs font-semibold">#{index + 1}</span>
                       <div className="flex flex-col">
-                        <button disabled={index === 0} onClick={() => moveProduct(p, "up")} className="rounded-md p-1 hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-30" title="Move up"><ArrowUp className="h-3.5 w-3.5" /></button>
-                        <button disabled={index === sorted.length - 1} onClick={() => moveProduct(p, "down")} className="rounded-md p-1 hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-30" title="Move down"><ArrowDown className="h-3.5 w-3.5" /></button>
+                        <button disabled={index === 0 || savingOrder} onClick={() => moveProduct(p, "up")} className="rounded-md p-1 hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-30" title="Move up"><ArrowUp className="h-3.5 w-3.5" /></button>
+                        <button disabled={index === orderedProducts.length - 1 || savingOrder} onClick={() => moveProduct(p, "down")} className="rounded-md p-1 hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-30" title="Move down"><ArrowDown className="h-3.5 w-3.5" /></button>
                       </div>
                     </div>
                   </td>
@@ -148,7 +184,7 @@ function AdminProductsPage() {
                       <button
                         onClick={async () => {
                           await deleteProduct(p.id);
-                          qc.invalidateQueries({ queryKey: ["products"] });
+                          await qc.invalidateQueries({ queryKey: ["products"] });
                           toast.success("Product deleted");
                         }}
                         className="rounded-lg p-2 text-destructive hover:bg-destructive/10"
@@ -161,6 +197,7 @@ function AdminProductsPage() {
               ))}
             </tbody>
           </table>
+          {savingOrder && <div className="border-t border-border px-4 py-3 text-xs font-semibold text-primary">Saving display order...</div>}
         </div>
       )}
 

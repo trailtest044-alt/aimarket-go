@@ -4,7 +4,6 @@ import { useMemo, useState } from "react";
 import { getProducts, getCategories } from "@/lib/api";
 import { SiteHeader, SiteFooter } from "@/components/site-header";
 import { ProductCard } from "@/components/product-card";
-import { ServerLoader } from "@/components/server-loader";
 import { Sparkles, ShieldCheck, Zap, Headphones, ArrowRight, Search } from "lucide-react";
 
 export const Route = createFileRoute("/")({
@@ -19,13 +18,13 @@ export const Route = createFileRoute("/")({
   component: HomePage,
 });
 
-function sortProductsForDisplay<T extends { sortOrder?: number; name: string }>(list: T[]) {
-  return [...list].sort((a, b) => {
-    const aOrder = Number(a.sortOrder);
-    const bOrder = Number(b.sortOrder);
-    const av = aOrder > 0 ? aOrder : 999999;
-    const bv = bOrder > 0 ? bOrder : 999999;
-    return av - bv || a.name.localeCompare(b.name);
+function sortForDisplay<T extends { sortOrder?: number; name?: string }>(items: T[]) {
+  return [...items].sort((a, b) => {
+    const ao = Number(a.sortOrder);
+    const bo = Number(b.sortOrder);
+    const av = ao > 0 ? ao : 999999;
+    const bv = bo > 0 ? bo : 999999;
+    return av - bv || String(a.name || "").localeCompare(String(b.name || ""));
   });
 }
 
@@ -36,7 +35,7 @@ function HomePage() {
   const [selected, setSelected] = useState("all");
 
   const filtered = useMemo(() => {
-    const list = sortProductsForDisplay(products ?? []);
+    const list = sortForDisplay(products ?? []);
     return list.filter((p) => {
       const matchCat = selected === "all" || p.category === selected;
       const matchQ =
@@ -108,7 +107,11 @@ function HomePage() {
           {/* Grid */}
           <div className="mt-6">
             {isLoading ? (
-              <ServerLoader title="Please wait, server loading..." message="Loading premium AI products for you." />
+              <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="h-72 animate-pulse rounded-2xl bg-secondary/40" />
+                ))}
+              </div>
             ) : visible.length === 0 ? (
               <div className="glass rounded-2xl py-16 text-center">
                 <h3 className="text-lg font-semibold">No products found</h3>
