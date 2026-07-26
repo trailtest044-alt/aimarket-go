@@ -1,6 +1,3 @@
 {
-  "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/index" },
-    { "source": "/((?!api/|assets/|index\\.html).*)", "destination": "/index.html" }
-  ]
+  "framework": "tanstack-start"
 }
