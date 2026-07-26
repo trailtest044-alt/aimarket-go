@@ -1,0 +1,13 @@
+# Dependencies
+node_modules/
+
+# npm lockfile — this project uses Bun (bun.lock is tracked); npm's lockfile must not be committed
+package-lock.json
+
+# Build output
+dist/
+.vercel/
+
+# Environment
+.env
+.env.local
