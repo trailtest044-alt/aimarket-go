@@ -14,7 +14,6 @@ export function ProductCard({ p }: { p: Product }) {
       {/* Top row: logo + badge */}
       <div className="flex items-start justify-between">
         <div className="relative">
-          <div className="absolute -inset-2 rounded-2xl bg-gradient-primary opacity-0 blur-xl transition-opacity duration-500 group-hover:opacity-30" />
           <ProductLogo
             logoUrl={p.logoUrl}
             icon={p.icon}

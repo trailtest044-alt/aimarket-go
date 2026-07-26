@@ -99,7 +99,6 @@ export function SiteHeader() {
 export function SiteFooter() {
   return (
     <footer className="relative mt-24 border-t border-border/70">
-      <div className="pointer-events-none absolute inset-x-0 -top-px h-px bg-gradient-to-r from-transparent via-primary/60 to-transparent" />
       <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6">
         <div className="grid gap-10 md:grid-cols-4">
           <div className="md:col-span-2">

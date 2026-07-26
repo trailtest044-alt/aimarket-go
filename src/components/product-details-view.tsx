@@ -48,10 +48,8 @@ export function ProductDetailsView({ productId }: { productId: string }) {
         {/* Left: hero card */}
         <div className="animate-rise">
           <div className="glass relative overflow-hidden rounded-3xl p-8 text-center lg:sticky lg:top-24">
-            <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-[radial-gradient(circle_at_50%_-30%,oklch(0.62_0.22_288/0.35),transparent_70%)]" />
             <div className="relative">
               <div className="relative mx-auto w-fit">
-                <div className="absolute -inset-4 rounded-[2.4rem] bg-gradient-primary opacity-25 blur-2xl animate-glow-pulse" />
                 <ProductLogo
                   logoUrl={product.logoUrl}
                   icon={product.icon}

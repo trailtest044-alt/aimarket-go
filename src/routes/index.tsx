@@ -67,11 +67,6 @@ function HomePage() {
 
       {/* Hero + products — kept above the fold */}
       <section id="products" className="relative overflow-hidden">
-        {/* Ambient halo */}
-        <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[420px] overflow-hidden">
-          <div className="absolute left-1/2 top-[-260px] h-[540px] w-[820px] -translate-x-1/2 rounded-full bg-[conic-gradient(from_140deg,oklch(0.82_0.135_84/0.26),oklch(0.72_0.16_330/0.18),oklch(0.7_0.14_264/0.14),oklch(0.82_0.135_84/0.26))] blur-3xl animate-spin-slow" />
-        </div>
-
         <div className="relative mx-auto max-w-7xl px-4 pb-8 pt-10 sm:px-6 sm:pt-12">
           <div className="animate-rise text-center sm:text-left">
             <div className="inline-flex items-center gap-2.5 rounded-full border border-border bg-white/4 px-4 py-1.5 text-xs backdrop-blur">
@@ -242,8 +237,6 @@ function HomePage() {
       <section className="mx-auto mt-20 max-w-7xl px-4 sm:px-6">
         <Reveal>
           <div className="relative overflow-hidden rounded-3xl glass-strong p-8 text-center sm:p-14">
-            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_-20%,oklch(0.62_0.22_288/0.3),transparent_60%)]" />
-            <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary to-transparent" />
             <div className="relative">
               <h2 className="mx-auto max-w-2xl font-display text-2xl font-bold sm:text-4xl">
                 Ready to power up your <span className="text-gradient">workflow</span>?

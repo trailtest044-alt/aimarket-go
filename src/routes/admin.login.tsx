@@ -34,8 +34,6 @@ function AdminLoginPage() {
 
   return (
     <div className="relative grid min-h-screen place-items-center overflow-hidden px-4">
-      <div className="pointer-events-none absolute left-1/2 top-[-220px] -z-10 h-[480px] w-[720px] -translate-x-1/2 rounded-full bg-[conic-gradient(from_140deg,oklch(0.62_0.22_288/0.25),oklch(0.72_0.15_218/0.18),oklch(0.62_0.22_288/0.25))] blur-3xl animate-spin-slow" />
-
       <div className="w-full max-w-md animate-rise-lg">
         <div className="mb-6 flex flex-col items-center">
           <BrandMark className="h-16 w-16 animate-float-y" />
