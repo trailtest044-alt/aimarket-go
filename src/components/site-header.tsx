@@ -1,9 +1,20 @@
 import { Link } from "@tanstack/react-router";
-import { Sparkles, Menu, X, ShoppingBag } from "lucide-react";
-import { useState } from "react";
+import { Menu, X, ShoppingBag, MessageCircle } from "lucide-react";
+import { useEffect, useState } from "react";
+import { BrandLogo, BrandMark } from "@/components/brand-logo";
+import { BRAND, SUPPORT } from "@/lib/brand";
 
 export function SiteHeader() {
   const [open, setOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 10);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
   const nav = [
     { to: "/", label: "Home" },
     { to: "/products", label: "Products" },
@@ -13,15 +24,16 @@ export function SiteHeader() {
 
   return (
     <header className="sticky top-0 z-50 w-full">
-      <div className="glass border-b border-border/60">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
-          <Link to="/" className="flex items-center gap-2 group">
-            <div className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-primary shadow-glow transition-transform group-hover:scale-110">
-              <Sparkles className="h-4 w-4 text-primary-foreground" />
-            </div>
-            <span className="text-lg font-bold tracking-tight">
-              AI<span className="text-gradient">Market</span>
-            </span>
+      <div
+        className={`border-b transition-all duration-300 ${
+          scrolled
+            ? "glass-strong border-border/80"
+            : "border-transparent bg-background/40 backdrop-blur-md"
+        }`}
+      >
+        <div className={`mx-auto flex max-w-7xl items-center justify-between px-4 transition-all duration-300 sm:px-6 ${scrolled ? "h-14" : "h-[4.25rem]"}`}>
+          <Link to="/" className="group" aria-label={`${BRAND.name} home`}>
+            <BrandLogo />
           </Link>
 
           <nav className="hidden items-center gap-1 md:flex">
@@ -29,8 +41,8 @@ export function SiteHeader() {
               <Link
                 key={n.to}
                 to={n.to}
-                className="rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-                activeProps={{ className: "rounded-lg px-3 py-2 text-sm text-foreground bg-secondary" }}
+                className="rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-white/5 hover:text-foreground"
+                activeProps={{ className: "rounded-lg px-3 py-2 text-sm font-semibold text-foreground bg-white/8" }}
                 activeOptions={{ exact: n.to === "/" }}
               >
                 {n.label}
@@ -39,30 +51,31 @@ export function SiteHeader() {
             <Link
               to="/"
               hash="products"
-              className="ml-2 inline-flex items-center gap-2 rounded-lg bg-gradient-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-glow transition-transform hover:scale-[1.03]"
+              className="btn-primary ml-2 inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold"
             >
               <ShoppingBag className="h-4 w-4" /> Shop now
             </Link>
           </nav>
 
           <button
-            className="rounded-lg p-2 text-foreground md:hidden"
+            className="btn-ghost rounded-lg p-2 text-foreground md:hidden"
             onClick={() => setOpen((s) => !s)}
             aria-label="Toggle menu"
+            aria-expanded={open}
           >
             {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
         </div>
 
         {open && (
-          <div className="border-t border-border/60 px-4 py-3 md:hidden">
-            <div className="flex flex-col gap-1">
+          <div className="animate-rise border-t border-border/70 px-4 py-4 md:hidden">
+            <div className="stagger flex flex-col gap-1">
               {nav.map((n) => (
                 <Link
                   key={n.to}
                   to={n.to}
                   onClick={() => setOpen(false)}
-                  className="rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground"
+                  className="rounded-xl px-3 py-2.5 text-sm text-muted-foreground hover:bg-white/6 hover:text-foreground"
                 >
                   {n.label}
                 </Link>
@@ -71,7 +84,7 @@ export function SiteHeader() {
                 to="/"
                 hash="products"
                 onClick={() => setOpen(false)}
-                className="mt-2 inline-flex items-center justify-center gap-2 rounded-lg bg-gradient-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-glow"
+                className="btn-primary mt-2 inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold"
               >
                 <ShoppingBag className="h-4 w-4" /> Shop now
               </Link>
@@ -85,35 +98,54 @@ export function SiteHeader() {
 
 export function SiteFooter() {
   return (
-    <footer className="mt-24 border-t border-border/60">
-      <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
-        <div className="grid gap-8 md:grid-cols-3">
-          <div>
-            <div className="flex items-center gap-2">
-              <div className="grid h-8 w-8 place-items-center rounded-lg bg-gradient-primary">
-                <Sparkles className="h-4 w-4 text-primary-foreground" />
-              </div>
-              <span className="font-bold">AIMarket</span>
-            </div>
-            <p className="mt-3 text-sm text-muted-foreground">
-              Premium AI subscriptions and digital products at unbeatable prices.
+    <footer className="relative mt-24 border-t border-border/70">
+      <div className="pointer-events-none absolute inset-x-0 -top-px h-px bg-gradient-to-r from-transparent via-primary/60 to-transparent" />
+      <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6">
+        <div className="grid gap-10 md:grid-cols-4">
+          <div className="md:col-span-2">
+            <BrandLogo />
+            <p className="mt-4 max-w-sm text-sm leading-6 text-muted-foreground">
+              {BRAND.tagline} Verified premium AI subscriptions and digital
+              products — hand-checked, delivered fast, backed by real support.
             </p>
+            <div className="mt-5 flex flex-wrap gap-2">
+              {["bKash", "Nagad", "Easypaisa", "JazzCash", "Binance"].map((p) => (
+                <span key={p} className="rounded-full border border-border bg-white/4 px-3 py-1 text-[11px] font-semibold text-muted-foreground">
+                  {p}
+                </span>
+              ))}
+            </div>
           </div>
+
           <div>
-            <h4 className="text-sm font-semibold">Quick Links</h4>
-            <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
-              <li><Link to="/products" className="hover:text-foreground">All Products</Link></li>
-              <li><Link to="/track-orders" className="hover:text-foreground">Track Your Orders</Link></li>
-              <li><Link to="/admin/login" className="hover:text-foreground">Admin</Link></li>
+            <h4 className="text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground">Quick links</h4>
+            <ul className="mt-4 space-y-2.5 text-sm text-muted-foreground">
+              <li><Link to="/products" className="transition-colors hover:text-foreground">All products</Link></li>
+              <li><Link to="/track-orders" className="transition-colors hover:text-foreground">Track your orders</Link></li>
+              <li><Link to="/admin/login" className="transition-colors hover:text-foreground">Admin</Link></li>
             </ul>
           </div>
+
           <div>
-            <h4 className="text-sm font-semibold">Support</h4>
-            <a href="https://api.whatsapp.com/send?phone=8801964719770" target="_blank" rel="noreferrer" className="mt-3 inline-flex rounded-xl bg-gradient-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-glow">Contact Support</a>
+            <h4 className="text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground">Support</h4>
+            <p className="mt-4 text-sm text-muted-foreground">Questions before or after payment? Message us anytime.</p>
+            <a
+              href={SUPPORT.bdWorld.href}
+              target="_blank"
+              rel="noreferrer"
+              className="btn-primary mt-4 inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold"
+            >
+              <MessageCircle className="h-4 w-4" /> WhatsApp support
+            </a>
           </div>
         </div>
-        <div className="mt-8 border-t border-border/60 pt-6 text-center text-xs text-muted-foreground">
-          © {new Date().getFullYear()} AIMarket. All rights reserved.
+
+        <div className="mt-10 flex flex-col items-center justify-between gap-3 border-t border-border/70 pt-6 text-xs text-muted-foreground sm:flex-row">
+          <div className="flex items-center gap-2">
+            <BrandMark className="h-5 w-5" />
+            <span>© {new Date().getFullYear()} {BRAND.name}. All rights reserved.</span>
+          </div>
+          <span className="font-mono text-[11px] tracking-wide text-muted-foreground/70">Secure manual approval · No password sharing</span>
         </div>
       </div>
     </footer>

@@ -186,7 +186,7 @@ function AdminProductsPage() {
               ))}
             </tbody>
           </table>
-          {dirty && <div className="border-t border-border px-4 py-3 text-xs text-amber-700">Order changed. Press Save Order if it was not saved automatically.</div>}
+          {dirty && <div className="border-t border-border px-4 py-3 text-xs font-semibold text-warning">Order changed. Press Save Order if it was not saved automatically.</div>}
         </div>
       )}
 

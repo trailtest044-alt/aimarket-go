@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import type { Product } from "@/lib/mock-data";
-import { ShoppingBag } from "lucide-react";
+import { ShoppingBag, Eye } from "lucide-react";
 import { ProductLogo } from "@/components/product-logo";
 import { formatMoney } from "@/lib/api";
 
@@ -8,36 +8,81 @@ export function ProductCard({ p }: { p: Product }) {
   const inStock = p.stock > 0;
   const price = formatMoney(p.price, p.currency);
   const original = p.originalPrice ? formatMoney(p.originalPrice, p.currency) : "";
+
   return (
-    <div className="group relative flex flex-col overflow-hidden rounded-3xl glass p-5 transition-all duration-300 hover:-translate-y-1.5 hover:border-primary/40 hover:shadow-glow soft-card-animate">
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-accent/10 opacity-0 transition-opacity group-hover:opacity-100" />
+    <div className="card-x group flex flex-col p-5">
+      {/* Top row: logo + badge */}
       <div className="flex items-start justify-between">
-        <ProductLogo logoUrl={p.logoUrl} icon={p.icon} name={p.name} className="h-14 w-14 rounded-2xl bg-secondary text-3xl" emojiClassName="text-3xl" />
-        {p.badge && <span className="rounded-full bg-gradient-primary px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-primary-foreground">{p.badge}</span>}
+        <div className="relative">
+          <div className="absolute -inset-2 rounded-2xl bg-gradient-primary opacity-0 blur-xl transition-opacity duration-500 group-hover:opacity-30" />
+          <ProductLogo
+            logoUrl={p.logoUrl}
+            icon={p.icon}
+            name={p.name}
+            className="relative h-14 w-14 rounded-2xl border border-border bg-white/6 text-3xl transition-transform duration-500 group-hover:scale-105 group-hover:-rotate-3"
+            emojiClassName="text-3xl"
+          />
+        </div>
+        {p.badge && (
+          <span className="rounded-full bg-gradient-gold px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-gold-foreground shadow-gold">
+            {p.badge}
+          </span>
+        )}
       </div>
-      <h3 className="mt-4 text-base font-semibold text-slate-900">{p.name}</h3>
-      <p className="mt-1 text-xs text-muted-foreground">{p.category}</p>
-      <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">{p.shortDescription}</p>
+
+      {/* Name + category */}
+      <h3 className="mt-4 text-base font-bold text-foreground">{p.name}</h3>
+      <p className="mt-0.5 text-xs font-medium uppercase tracking-wider text-muted-foreground/80">{p.category}</p>
+      <p className="mt-2 line-clamp-2 text-sm leading-6 text-muted-foreground">{p.shortDescription}</p>
+
+      {/* Price + stock */}
       <div className="mt-4 flex items-end justify-between">
         <div>
           <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-gradient">{price}</span>
-            {original && <span className="text-sm text-muted-foreground line-through">{original}</span>}
+            <span className="font-display text-xl font-bold text-gold-gradient sm:text-2xl">{price}</span>
+            {original && <span className="text-sm text-muted-foreground/70 line-through">{original}</span>}
           </div>
-          {/* Customer-facing cards should show only the final detected price, not the internal region label. */}
-          <div className="mt-1 flex items-center gap-1.5 text-xs">
-            <span className={`h-1.5 w-1.5 rounded-full ${inStock ? "bg-success" : "bg-destructive"}`} />
-            <span className={inStock ? "text-success" : "text-destructive"}>{inStock ? `${p.stock} in stock` : "Out of stock"}</span>
+          <div className="mt-1.5 flex items-center gap-2 text-xs">
+            {inStock ? (
+              <>
+                <span className="live-dot" />
+                <span className="font-semibold text-success">{p.stock} in stock</span>
+              </>
+            ) : (
+              <>
+                <span className="h-1.5 w-1.5 rounded-full bg-destructive" />
+                <span className="font-semibold text-destructive">Out of stock</span>
+              </>
+            )}
           </div>
         </div>
       </div>
+
+      {/* Actions */}
       <div className="mt-5 grid grid-cols-2 gap-2">
-        <Link to="/products/$id" params={{ id: p.id }} className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-border bg-white/65 px-3 py-2.5 text-sm font-medium text-foreground transition hover:bg-secondary">View Details</Link>
+        <Link
+          to="/products/$id"
+          params={{ id: p.id }}
+          className="btn-ghost inline-flex items-center justify-center gap-1.5 rounded-xl px-3 py-2.5 text-sm font-medium text-foreground"
+        >
+          <Eye className="h-4 w-4" /> Details
+        </Link>
         {inStock ? (
-          <Link to="/checkout/$productId" params={{ productId: p.id }} className="buy-now-btn inline-flex items-center justify-center gap-1.5 rounded-xl bg-gradient-primary px-3 py-2.5 text-sm font-semibold text-primary-foreground shadow-glow transition-transform hover:scale-[1.02]">
-            <ShoppingBag className="h-4 w-4" /> Buy Now
+          <Link
+            to="/checkout/$productId"
+            params={{ productId: p.id }}
+            className="btn-primary inline-flex items-center justify-center gap-1.5 rounded-xl px-3 py-2.5 text-sm font-semibold"
+          >
+            <ShoppingBag className="h-4 w-4" /> Buy now
           </Link>
-        ) : <button disabled className="inline-flex cursor-not-allowed items-center justify-center gap-1.5 rounded-xl bg-secondary/40 px-3 py-2.5 text-sm font-semibold text-muted-foreground">Out of stock</button>}
+        ) : (
+          <button
+            disabled
+            className="inline-flex cursor-not-allowed items-center justify-center gap-1.5 rounded-xl border border-border bg-white/3 px-3 py-2.5 text-sm font-semibold text-muted-foreground/60"
+          >
+            Out of stock
+          </button>
+        )}
       </div>
     </div>
   );
