@@ -37,6 +37,7 @@ const STORAGE_KEYS = {
   adminInfo: "mp_admin_info",
   orderTokens: "mp_order_tokens",
   region: "mp_price_region",
+  regionOverride: "mp_region_override",
 };
 
 const isBrowser = typeof window !== "undefined";
@@ -173,23 +174,51 @@ function stockToFrontend(s: BackendStock): StockItem { const productId = typeof 
 async function resolveBackendProductId(productIdOrSlug: string): Promise<string> { if (objectIdRe.test(productIdOrSlug)) return productIdOrSlug; const product = await getProductById(productIdOrSlug); return product?.backendId || productIdOrSlug; }
 
 export async function getVisitorRegion(): Promise<{ region: PriceRegion; country?: string }> {
+  // A manual choice always wins, so a BD buyer can force ৳/bKash regardless of IP.
+  if (isBrowser) {
+    const override = load<PriceRegion | null>(STORAGE_KEYS.regionOverride, null);
+    if (override === "bd" || override === "pk" || override === "world") return { region: override };
+  }
   if (IS_MOCK_MODE) return { region: load<PriceRegion>(STORAGE_KEYS.region, "world") };
   if (isBrowser) {
     const cached = load<{ region: PriceRegion; country?: string; ts?: number } | null>(STORAGE_KEYS.region, null);
-    if (cached?.region && cached.ts && Date.now() - cached.ts < 1000 * 60 * 60 * 12) return cached;
+    if (cached?.region && cached.ts && Date.now() - cached.ts < 1000 * 60 * 60) return cached;
   }
   let region: PriceRegion = "world"; let country = "XX";
   try {
     const r = await fetch("https://ipapi.co/json/");
     if (r.ok) { const data = await r.json(); country = String(data.country_code || "XX").toUpperCase(); if (country === "BD") region = "bd"; else if (country === "PK") region = "pk"; }
   } catch {}
-  try {
-    const data = await http<{ region: PriceRegion; country: string }>(`/region?region=${region}`);
-    if (data?.country && data.country !== "XX") { country = data.country; region = data.region; }
-  } catch {}
+  // The backend runs off-region (Render/US), so only consult it when the client
+  // couldn't place the visitor — and never let it downgrade a confident bd/pk.
+  if (region === "world") {
+    try {
+      const data = await http<{ region: PriceRegion; country: string }>(`/region?region=${region}`);
+      if (data?.region === "bd" || data?.region === "pk") { region = data.region; if (data.country) country = data.country; }
+    } catch {}
+  }
   const result = { region, country, ts: Date.now() };
   save(STORAGE_KEYS.region, result);
   return result;
+}
+
+/** Manually pin the pricing region (from the header switcher). Overrides IP detection. */
+export function setVisitorRegion(region: PriceRegion) {
+  if (!isBrowser) return;
+  window.localStorage.setItem(STORAGE_KEYS.regionOverride, JSON.stringify(region));
+  save(STORAGE_KEYS.region, { region, country: region === "bd" ? "BD" : region === "pk" ? "PK" : "XX", ts: Date.now() });
+}
+
+/** The pinned region, or null when detection is in charge. */
+export function getRegionOverride(): PriceRegion | null {
+  return isBrowser ? load<PriceRegion | null>(STORAGE_KEYS.regionOverride, null) : null;
+}
+
+/** Drop the manual pin and clear the cached detection so IP takes over again. */
+export function clearVisitorRegionOverride() {
+  if (!isBrowser) return;
+  window.localStorage.removeItem(STORAGE_KEYS.regionOverride);
+  window.localStorage.removeItem(STORAGE_KEYS.region);
 }
 
 export async function getProducts(): Promise<Product[]> { if (IS_MOCK_MODE) return delay(load(STORAGE_KEYS.products, mockProducts)); const region = (await getVisitorRegion()).region; const data = await http<{ products: BackendProduct[] }>(`/products?region=${region}`); return data.products.map(productToFrontend).sort((a, b) => (a.sortOrder || 999999) - (b.sortOrder || 999999) || a.name.localeCompare(b.name)); }

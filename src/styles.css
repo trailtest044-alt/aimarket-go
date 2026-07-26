@@ -471,15 +471,54 @@
   box-shadow: 0 0 0 2px rgba(22, 24, 28, 0.12);
 }
 
-/* Product card: flat paper, hairline, tiny radius. No lift, glow or gradient. */
+/* Product card: flat paper, hairline, tiny radius. Motion is pointer-driven —
+   a gentle tilt toward the cursor, a soft paper highlight that tracks it, and
+   a small lift on hover. Neutral ink only: no coloured glow, no gradient. */
 .card-x {
   position: relative;
   border-radius: var(--radius);
   border: 1px solid var(--border);
   background: var(--card);
-  transition: border-color 0.14s ease;
+  transform: perspective(900px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+  transform-style: preserve-3d;
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
 }
-.card-x:hover { border-color: var(--border-strong); }
+.card-x::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(240px circle at var(--mx, 50%) var(--my, 0%), rgba(22, 24, 28, 0.05), transparent 60%);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+}
+.card-x:hover {
+  border-color: var(--border-strong);
+  box-shadow: 0 1px 2px rgba(22, 24, 28, 0.05), 0 18px 40px -24px rgba(22, 24, 28, 0.25);
+}
+.card-x:hover::after { opacity: 1; }
+
+/* Site-wide cursor companion: a soft paper spotlight trailing the pointer.
+   Pointer-fine devices only; switched off under reduced motion. */
+.cursor-glow {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 9999;
+  height: 26rem;
+  width: 26rem;
+  border-radius: 999px;
+  pointer-events: none;
+  transform: translate3d(var(--cx, -1000px), var(--cy, -1000px), 0) translate(-50%, -50%);
+  background: radial-gradient(circle, rgba(22, 24, 28, 0.05), transparent 60%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.cursor-glow[data-active="true"] { opacity: 1; }
+@media (hover: none), (prefers-reduced-motion: reduce) {
+  .cursor-glow { display: none; }
+}
 
 /* Category chip */
 .chip {
@@ -500,8 +539,9 @@
 .live-dot { position: relative; display: inline-flex; height: 7px; width: 7px; }
 .live-dot::before { content: ""; position: absolute; inset: 0; border-radius: 999px; background: var(--success); }
 
-/* Staggered entrance: short fade-up, no blur or scale. */
-.stagger > * { animation: fade-up 0.28s cubic-bezier(0.2, 0, 0, 1) both; }
+/* Staggered entrance: a quick pop-in (fade + rise + slight scale), so cards
+   and lists animate into place as they appear or after filtering. */
+.stagger > * { animation: card-pop 0.34s cubic-bezier(0.2, 0, 0, 1) both; }
 .stagger > *:nth-child(1) { animation-delay: 0.02s; }
 .stagger > *:nth-child(2) { animation-delay: 0.05s; }
 .stagger > *:nth-child(3) { animation-delay: 0.08s; }
@@ -653,6 +693,7 @@ a:hover .brand-mark, .brand-mark:hover { opacity: 0.75; }
 @keyframes loader-slide { 0% { transform: translateX(-100%); } 100% { transform: translateX(320%); } }
 @keyframes promo-shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 55% { transform: translateX(4px); } 80% { transform: translateX(-2px); } }
 @keyframes copy-flash { 0% { box-shadow: 0 0 0 0 rgba(15, 110, 86, 0.5); } 100% { box-shadow: 0 0 0 10px transparent; } }
+@keyframes card-pop { from { opacity: 0; transform: translateY(10px) scale(0.97); } to { opacity: 1; transform: none; } }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

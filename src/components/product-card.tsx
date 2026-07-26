@@ -10,7 +10,22 @@ export function ProductCard({ p }: { p: Product }) {
   const original = p.originalPrice ? formatMoney(p.originalPrice, p.currency) : "";
 
   return (
-    <div className="card-x group flex flex-col p-5">
+    <div
+      className="card-x group flex flex-col p-5"
+      onPointerMove={(e) => {
+        const r = e.currentTarget.getBoundingClientRect();
+        const px = (e.clientX - r.left) / r.width;
+        const py = (e.clientY - r.top) / r.height;
+        e.currentTarget.style.setProperty("--mx", `${px * 100}%`);
+        e.currentTarget.style.setProperty("--my", `${py * 100}%`);
+        e.currentTarget.style.setProperty("--ry", `${(px - 0.5) * 6}deg`);
+        e.currentTarget.style.setProperty("--rx", `${(0.5 - py) * 6}deg`);
+      }}
+      onPointerLeave={(e) => {
+        e.currentTarget.style.setProperty("--rx", "0deg");
+        e.currentTarget.style.setProperty("--ry", "0deg");
+      }}
+    >
       {/* Top row: logo + badge */}
       <div className="flex items-start justify-between">
         <div className="relative">
@@ -18,7 +33,7 @@ export function ProductCard({ p }: { p: Product }) {
             logoUrl={p.logoUrl}
             icon={p.icon}
             name={p.name}
-            className="relative h-14 w-14 rounded-2xl border border-border bg-white/6 text-3xl transition-transform duration-500 group-hover:scale-105 group-hover:-rotate-3"
+            className="relative h-14 w-14 rounded-xl border border-border bg-secondary text-3xl transition-transform duration-300 group-hover:scale-110 group-hover:-rotate-2"
             emojiClassName="text-3xl"
           />
         </div>

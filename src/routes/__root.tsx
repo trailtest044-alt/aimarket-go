@@ -14,6 +14,7 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { BRAND } from "../lib/brand";
 import { BrandMark } from "../components/brand-logo";
+import { CursorGlow } from "../components/cursor-glow";
 
 function NotFoundComponent() {
   return (
@@ -121,7 +122,8 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <Outlet />
-      <Toaster theme="dark" position="top-right" richColors />
+      <CursorGlow />
+      <Toaster theme="light" position="top-right" richColors />
     </QueryClientProvider>
   );
 }

@@ -1,8 +1,58 @@
 import { Link } from "@tanstack/react-router";
 import { Menu, X, ShoppingBag, MessageCircle } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { BrandLogo, BrandMark } from "@/components/brand-logo";
 import { BRAND, SUPPORT } from "@/lib/brand";
+import { getVisitorRegion, getRegionOverride, setVisitorRegion } from "@/lib/api";
+import type { PriceRegion } from "@/lib/mock-data";
+
+const REGION_OPTIONS: { key: PriceRegion; label: string }[] = [
+  { key: "bd", label: "৳ BDT" },
+  { key: "pk", label: "Rs PKR" },
+  { key: "world", label: "USDT" },
+];
+
+/** Manual currency/region switch. A BD buyer can force ৳ + bKash/Nagad even if
+ *  IP detection guesses wrong; changing it refetches region-priced data. */
+function RegionSwitcher({ className = "" }: { className?: string }) {
+  const qc = useQueryClient();
+  const [region, setRegion] = useState<PriceRegion>("world");
+
+  useEffect(() => {
+    const pinned = getRegionOverride();
+    if (pinned) setRegion(pinned);
+    else getVisitorRegion().then((r) => setRegion(r.region)).catch(() => {});
+  }, []);
+
+  const pick = (r: PriceRegion) => {
+    setVisitorRegion(r);
+    setRegion(r);
+    qc.invalidateQueries();
+  };
+
+  return (
+    <div
+      className={`inline-flex items-center rounded-xl border border-border bg-card p-0.5 ${className}`}
+      role="group"
+      aria-label="Choose currency"
+    >
+      {REGION_OPTIONS.map((o) => (
+        <button
+          key={o.key}
+          type="button"
+          onClick={() => pick(o.key)}
+          aria-pressed={region === o.key}
+          className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-colors ${
+            region === o.key ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 export function SiteHeader() {
   const [open, setOpen] = useState(false);
@@ -48,6 +98,7 @@ export function SiteHeader() {
                 {n.label}
               </Link>
             ))}
+            <RegionSwitcher className="ml-2" />
             <Link
               to="/"
               hash="products"
@@ -80,6 +131,7 @@ export function SiteHeader() {
                   {n.label}
                 </Link>
               ))}
+              <RegionSwitcher className="mt-2 self-start" />
               <Link
                 to="/"
                 hash="products"
