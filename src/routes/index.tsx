@@ -5,19 +5,41 @@ import { getProducts, getCategories } from "@/lib/api";
 import { SiteHeader, SiteFooter } from "@/components/site-header";
 import { ProductCard } from "@/components/product-card";
 import { ServerLoader } from "@/components/server-loader";
-import { Sparkles, ShieldCheck, Zap, Headphones, ArrowRight, Search } from "lucide-react";
+import { Reveal } from "@/components/reveal";
+import { BRAND } from "@/lib/brand";
+import {
+  ShieldCheck,
+  Zap,
+  Headphones,
+  ArrowRight,
+  Search,
+  BadgeCheck,
+  MousePointerClick,
+  Wallet,
+  PackageCheck,
+  Gem,
+} from "lucide-react";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "AIMarket — Premium AI Products & Accounts" },
-      { name: "description", content: "Shop premium AI subscriptions including ChatGPT Plus, Gemini Advanced, Midjourney, Ideogram, Recraft and more." },
-      { property: "og:title", content: "AIMarket — Premium AI Products" },
-      { property: "og:description", content: "Premium AI subscriptions at unbeatable prices." },
+      { title: `${BRAND.name} — Premium AI Products & Accounts` },
+      { name: "description", content: BRAND.description },
+      { property: "og:title", content: `${BRAND.name} — Premium AI Products` },
+      { property: "og:description", content: BRAND.tagline },
     ],
   }),
   component: HomePage,
 });
+
+const TICKER = [
+  "Instant delivery",
+  "Verified accounts",
+  "bKash · Nagad · Binance",
+  "Real WhatsApp support",
+  "12,000+ orders delivered",
+  "Original subscriptions only",
+];
 
 function HomePage() {
   const { data: products, isLoading } = useQuery({ queryKey: ["products"], queryFn: getProducts });
@@ -43,144 +65,202 @@ function HomePage() {
     <div className="min-h-screen">
       <SiteHeader />
 
-      {/* Products first — above the fold */}
+      {/* Hero + products — kept above the fold */}
       <section id="products" className="relative overflow-hidden">
-        <div className="pointer-events-none absolute inset-0">
-          <div className="absolute -left-20 top-0 h-72 w-72 rounded-full bg-primary/20 blur-3xl animate-blob" />
-          <div className="absolute right-0 top-20 h-80 w-80 rounded-full bg-accent/20 blur-3xl animate-blob" style={{ animationDelay: "4s" }} />
+        {/* Ambient halo */}
+        <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[420px] overflow-hidden">
+          <div className="absolute left-1/2 top-[-260px] h-[540px] w-[820px] -translate-x-1/2 rounded-full bg-[conic-gradient(from_140deg,oklch(0.82_0.135_84/0.26),oklch(0.72_0.16_330/0.18),oklch(0.7_0.14_264/0.14),oklch(0.82_0.135_84/0.26))] blur-3xl animate-spin-slow" />
         </div>
 
-        <div className="relative mx-auto max-w-7xl px-4 pb-8 pt-8 sm:px-6 sm:pt-10">
-          <div className="animate-fade-up">
-            <div className="inline-flex items-center gap-2 rounded-full glass px-3 py-1 text-xs">
-              <Sparkles className="h-3.5 w-3.5 text-primary" />
-              <span className="text-muted-foreground">Trusted by 12,000+ creators</span>
+        <div className="relative mx-auto max-w-7xl px-4 pb-8 pt-10 sm:px-6 sm:pt-12">
+          <div className="animate-rise text-center sm:text-left">
+            <div className="inline-flex items-center gap-2.5 rounded-full border border-border bg-white/4 px-4 py-1.5 text-xs backdrop-blur">
+              <span className="live-dot" />
+              <span className="font-semibold text-foreground/90">Trusted by 12,000+ creators</span>
+              <span className="text-muted-foreground">· delivery in under 1 hour</span>
             </div>
-            <h1 className="mt-3 text-2xl font-bold sm:text-3xl">
-              Premium <span className="text-gradient">AI Products</span>
+
+            <h1 className="display-luxe mx-auto mt-5 max-w-3xl text-4xl font-bold leading-[1.12] sm:mx-0 sm:text-5xl lg:text-6xl">
+              Premium <em className="text-holo">AI tools</em>.
+              <br className="hidden sm:block" />
+              <span className="text-muted-foreground">Real accounts, </span>
+              <span className="text-gold-gradient">fair prices</span>.
             </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Verified accounts, instant delivery, real support. Pick a product and check out in minutes.
+            <p className="mx-auto mt-4 max-w-xl text-sm leading-7 text-muted-foreground sm:mx-0 sm:text-base">
+              ChatGPT, Gemini, Midjourney and more — hand-verified before sale,
+              delivered fast after payment. Pick a product and check out in minutes.
             </p>
           </div>
 
-          {/* Filters */}
-          <div className="mt-5 glass rounded-2xl p-4">
+          {/* Search + categories */}
+          <div className="glass mt-7 rounded-2xl p-4 animate-rise [animation-delay:0.12s]">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <input
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
-                placeholder="Search products..."
-                className="w-full rounded-xl bg-input/50 py-2.5 pl-10 pr-3 text-sm outline-none ring-1 ring-border focus:ring-primary"
+                placeholder="Search ChatGPT, Midjourney, Canva..."
+                className="input-x w-full py-3 pl-11 pr-4 text-sm"
               />
             </div>
             <div className="mt-3 -mx-1 flex gap-2 overflow-x-auto pb-1">
-              {(categories ?? []).map((c) => {
-                const active = c.id === selected;
-                return (
-                  <button
-                    key={c.id}
-                    onClick={() => setSelected(c.id)}
-                    className={`whitespace-nowrap rounded-full px-4 py-1.5 text-xs font-medium transition ${
-                      active
-                        ? "bg-gradient-primary text-primary-foreground shadow-glow"
-                        : "border border-border bg-secondary text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    <span className="mr-1">{c.icon}</span>{c.name}
-                  </button>
-                );
-              })}
+              {(categories ?? []).map((c) => (
+                <button
+                  key={c.id}
+                  onClick={() => setSelected(c.id)}
+                  data-active={c.id === selected}
+                  className="chip whitespace-nowrap rounded-full px-4 py-1.5 text-xs font-semibold"
+                >
+                  <span className="mr-1">{c.icon}</span>
+                  {c.name}
+                </button>
+              ))}
             </div>
           </div>
 
           {/* Grid */}
-          <div className="mt-6">
+          <div className="mt-7">
             {isLoading ? (
-              <ServerLoader title="Please wait, server loading..." message="Our little AI assistant is preparing the product list." />
+              <ServerLoader title="Please wait, server loading..." message="Waking the server and preparing the product list." />
             ) : visible.length === 0 ? (
-              <div className="glass rounded-2xl py-16 text-center">
+              <div className="glass animate-pop rounded-2xl py-16 text-center">
                 <h3 className="text-lg font-semibold">No products found</h3>
                 <p className="mt-1 text-sm text-muted-foreground">Try a different search or category.</p>
               </div>
             ) : (
-              <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="stagger grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
                 {visible.map((p) => <ProductCard key={p.id} p={p} />)}
               </div>
             )}
 
-            <div className="mt-6 flex justify-center">
+            <div className="mt-8 flex justify-center">
               <Link
                 to="/products"
-                className="inline-flex items-center gap-2 rounded-xl glass px-5 py-2.5 text-sm font-semibold hover:bg-secondary"
+                className="btn-ghost group inline-flex items-center gap-2 rounded-xl px-6 py-3 text-sm font-semibold"
               >
-                View all products <ArrowRight className="h-4 w-4" />
+                View all products
+                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
               </Link>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Trust */}
-      <section className="mx-auto mt-8 max-w-7xl px-4 sm:px-6">
+      {/* Trust ticker */}
+      <div className="marquee border-y border-border/60 bg-white/2 py-3.5">
+        <div className="marquee-track">
+          {[...TICKER, ...TICKER].map((t, i) => (
+            <span key={i} className="flex items-center gap-2.5 text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              <Gem className="h-3.5 w-3.5 text-gold" /> {t}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* How it works */}
+      <section className="mx-auto mt-20 max-w-7xl px-4 sm:px-6">
+        <Reveal>
+          <span className="eyebrow">How it works</span>
+          <h2 className="mt-3 font-display text-2xl font-bold sm:text-3xl">Three steps. That's it.</h2>
+          <p className="mt-2 max-w-xl text-sm text-muted-foreground sm:text-base">
+            No sign-up needed. Order, pay with your local method, and get your
+            account details on the same page after approval.
+          </p>
+        </Reveal>
+
+        <div className="mt-8 grid gap-4 sm:grid-cols-3">
+          {[
+            { icon: MousePointerClick, step: "01", title: "Choose a product", desc: "Browse verified AI subscriptions and tap Buy now on the one you want." },
+            { icon: Wallet, step: "02", title: "Pay your way", desc: "bKash & Nagad in Bangladesh, Easypaisa & JazzCash in Pakistan, Binance worldwide. Paste your Transaction ID." },
+            { icon: PackageCheck, step: "03", title: "Get it delivered", desc: "Admin verifies your payment, then login details and instructions unlock automatically on your order page." },
+          ].map((s, i) => (
+            <Reveal key={s.step} delay={i * 110}>
+              <div className="card-x h-full p-6">
+                <div className="flex items-center justify-between">
+                  <div className="grid h-11 w-11 place-items-center rounded-xl bg-gradient-primary shadow-glow">
+                    <s.icon className="h-5 w-5 text-primary-foreground" />
+                  </div>
+                  <span className="font-display text-2xl font-bold text-white/10">{s.step}</span>
+                </div>
+                <h3 className="mt-4 text-base font-bold">{s.title}</h3>
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">{s.desc}</p>
+              </div>
+            </Reveal>
+          ))}
+        </div>
+      </section>
+
+      {/* Trust grid */}
+      <section className="mx-auto mt-20 max-w-7xl px-4 sm:px-6">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {[
-            { icon: Zap, title: "Instant Delivery", desc: "Most orders delivered in under 1 hour." },
-            { icon: ShieldCheck, title: "Verified Accounts", desc: "Every product is hand-checked before sale." },
-            { icon: Headphones, title: "Real Support", desc: "WhatsApp & Telegram support, always on." },
-            { icon: Sparkles, title: "Premium Only", desc: "Original subscriptions, no cracks or hacks." },
-          ].map((t) => (
-            <div key={t.title} className="glass rounded-2xl p-5">
-              <div className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-primary">
-                <t.icon className="h-4 w-4 text-primary-foreground" />
+            { icon: Zap, title: "Instant delivery", desc: "Most orders delivered in under 1 hour." },
+            { icon: ShieldCheck, title: "Verified accounts", desc: "Every product is hand-checked before sale." },
+            { icon: Headphones, title: "Real support", desc: "WhatsApp support for BD, PK & worldwide — always on." },
+            { icon: BadgeCheck, title: "Premium only", desc: "Original subscriptions. No cracks, no hacks." },
+          ].map((t, i) => (
+            <Reveal key={t.title} delay={i * 90}>
+              <div className="glass h-full rounded-2xl p-5 transition-transform duration-300 hover:-translate-y-1">
+                <div className="grid h-10 w-10 place-items-center rounded-xl border border-border bg-white/5">
+                  <t.icon className="h-4 w-4 text-accent" />
+                </div>
+                <h3 className="mt-3 text-sm font-bold">{t.title}</h3>
+                <p className="mt-1 text-xs leading-5 text-muted-foreground">{t.desc}</p>
               </div>
-              <h3 className="mt-3 text-sm font-semibold">{t.title}</h3>
-              <p className="mt-1 text-xs text-muted-foreground">{t.desc}</p>
-            </div>
+            </Reveal>
           ))}
         </div>
       </section>
 
       {/* Categories */}
-      <section className="mx-auto mt-16 max-w-7xl px-4 sm:px-6">
-        <h2 className="text-2xl font-bold sm:text-3xl">Shop by category</h2>
-        <p className="mt-1 text-sm text-muted-foreground">Find exactly what you need.</p>
-        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-          {(categories ?? []).slice(1).map((c) => (
-            <Link
-              key={c.id}
-              to="/products"
-              search={{ category: c.id }}
-              className="group glass rounded-2xl p-5 text-left transition-transform hover:-translate-y-1 hover:shadow-glow"
-            >
-              <div className="text-3xl">{c.icon}</div>
-              <div className="mt-3 text-sm font-semibold">{c.name}</div>
-              <div className="mt-1 text-xs text-muted-foreground group-hover:text-primary">
-                Explore →
-              </div>
-            </Link>
+      <section className="mx-auto mt-20 max-w-7xl px-4 sm:px-6">
+        <Reveal>
+          <span className="eyebrow">Categories</span>
+          <h2 className="mt-3 font-display text-2xl font-bold sm:text-3xl">Shop by category</h2>
+          <p className="mt-2 text-sm text-muted-foreground sm:text-base">Find exactly what you need.</p>
+        </Reveal>
+        <div className="mt-7 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+          {(categories ?? []).slice(1).map((c, i) => (
+            <Reveal key={c.id} delay={i * 60}>
+              <Link
+                to="/products"
+                search={{ category: c.id }}
+                className="card-x group block h-full p-5 text-left"
+              >
+                <div className="text-3xl transition-transform duration-300 group-hover:scale-110">{c.icon}</div>
+                <div className="mt-3 text-sm font-bold">{c.name}</div>
+                <div className="mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors group-hover:text-accent">
+                  Explore <ArrowRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5" />
+                </div>
+              </Link>
+            </Reveal>
           ))}
         </div>
       </section>
 
       {/* CTA */}
-      <section className="mx-auto mt-16 max-w-7xl px-4 sm:px-6">
-        <div className="relative overflow-hidden rounded-3xl glass-strong p-8 sm:p-12 text-center">
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/20 to-accent/10" />
-          <div className="relative">
-            <h2 className="text-3xl font-bold sm:text-4xl">Ready to power up your workflow?</h2>
-            <p className="mx-auto mt-3 max-w-xl text-muted-foreground">
-              Join thousands using our affordable premium AI accounts.
-            </p>
-            <Link
-              to="/products"
-              className="mt-6 inline-flex items-center gap-2 rounded-xl bg-gradient-primary px-6 py-3 text-sm font-semibold text-primary-foreground shadow-glow"
-            >
-              Browse all products <ArrowRight className="h-4 w-4" />
-            </Link>
+      <section className="mx-auto mt-20 max-w-7xl px-4 sm:px-6">
+        <Reveal>
+          <div className="relative overflow-hidden rounded-3xl glass-strong p-8 text-center sm:p-14">
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_-20%,oklch(0.62_0.22_288/0.3),transparent_60%)]" />
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary to-transparent" />
+            <div className="relative">
+              <h2 className="mx-auto max-w-2xl font-display text-2xl font-bold sm:text-4xl">
+                Ready to power up your <span className="text-gradient">workflow</span>?
+              </h2>
+              <p className="mx-auto mt-4 max-w-xl text-sm text-muted-foreground sm:text-base">
+                Join thousands using affordable premium AI accounts — with real
+                humans on support if you ever need help.
+              </p>
+              <Link
+                to="/products"
+                className="btn-primary mt-7 inline-flex items-center gap-2 rounded-xl px-7 py-3.5 text-sm font-semibold"
+              >
+                Browse all products <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
           </div>
-        </div>
+        </Reveal>
       </section>
 
       <SiteFooter />
