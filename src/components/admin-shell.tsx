@@ -1,5 +1,5 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { LayoutDashboard, Package, Wallet, Boxes, Clock, CheckCircle2, Truck, XCircle, LogOut, Users, Search } from "lucide-react";
+import { LayoutDashboard, Package, Wallet, Boxes, Clock, CheckCircle2, Truck, XCircle, LogOut, Users, Search, BadgePercent } from "lucide-react";
 import { adminLogout, isAdminAuthed, getCurrentAdmin, getDashboard } from "@/lib/api";
 import { useEffect, type ReactNode, type ComponentType } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -12,6 +12,7 @@ const items: NavItem[] = [
   { to: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true },
   { to: "/admin/products", label: "Products", icon: Package },
   { to: "/admin/payment-settings", label: "Payment Settings", icon: Wallet },
+  { to: "/admin/promo-codes", label: "Promo Codes", icon: BadgePercent },
   { to: "/admin/stock", label: "Account Stock", icon: Boxes },
   { to: "/admin/orders/pending", label: "Pending Orders", icon: Clock },
   { to: "/admin/orders/approved", label: "Approved Orders", icon: CheckCircle2 },

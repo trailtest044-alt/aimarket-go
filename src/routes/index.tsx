@@ -69,7 +69,7 @@ function HomePage() {
       <section id="products" className="relative overflow-hidden">
         {/* Ambient halo */}
         <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[420px] overflow-hidden">
-          <div className="absolute left-1/2 top-[-260px] h-[540px] w-[820px] -translate-x-1/2 rounded-full bg-[conic-gradient(from_140deg,oklch(0.62_0.22_288/0.28),oklch(0.72_0.15_218/0.2),oklch(0.84_0.12_87/0.1),oklch(0.62_0.22_288/0.28))] blur-3xl animate-spin-slow" />
+          <div className="absolute left-1/2 top-[-260px] h-[540px] w-[820px] -translate-x-1/2 rounded-full bg-[conic-gradient(from_140deg,oklch(0.82_0.135_84/0.26),oklch(0.72_0.16_330/0.18),oklch(0.7_0.14_264/0.14),oklch(0.82_0.135_84/0.26))] blur-3xl animate-spin-slow" />
         </div>
 
         <div className="relative mx-auto max-w-7xl px-4 pb-8 pt-10 sm:px-6 sm:pt-12">
@@ -80,10 +80,10 @@ function HomePage() {
               <span className="text-muted-foreground">· delivery in under 1 hour</span>
             </div>
 
-            <h1 className="mx-auto mt-5 max-w-3xl font-display text-3xl font-bold leading-[1.15] sm:mx-0 sm:text-4xl lg:text-5xl">
-              Premium <span className="text-gradient">AI tools</span>.
+            <h1 className="display-luxe mx-auto mt-5 max-w-3xl text-4xl font-bold leading-[1.12] sm:mx-0 sm:text-5xl lg:text-6xl">
+              Premium <em className="text-holo">AI tools</em>.
               <br className="hidden sm:block" />
-              <span className="text-muted-foreground"> Real accounts, </span>
+              <span className="text-muted-foreground">Real accounts, </span>
               <span className="text-gold-gradient">fair prices</span>.
             </h1>
             <p className="mx-auto mt-4 max-w-xl text-sm leading-7 text-muted-foreground sm:mx-0 sm:text-base">

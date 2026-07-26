@@ -1,81 +1,41 @@
-# 🎨 CUSTOMIZE GUIDE — সব সহজে বদলানোর গাইড
+# 🎛️ CUSTOMIZE GUIDE — সব কিছু কোথায় এডিট করবেন
 
-এই ফাইলে দেখানো আছে কোন জিনিস কোথা থেকে বদলাবেন। কোড না জানলেও পারবেন।
-(Everything you may want to change, and exactly where to change it.)
-
----
-
-## 1) দোকানের নাম / Brand name & tagline
-
-**ফাইল:** `src/lib/brand.ts`
-
-```ts
-export const BRAND = {
-  name: "AIMarket",        // ← পুরো নাম
-  nameAccent: "AI",        // ← নামের যেই অংশ গ্রেডিয়েন্ট রঙে দেখাবে
-  nameRest: "Market",      // ← বাকি অংশ
-  tagline: "Premium AI, delivered fast.",
-  ...
-};
-```
-
-নাম বদলালে লোগো, হেডার, ফুটার, অ্যাডমিন প্যানেল, ব্রাউজার ট্যাব — সব জায়গায় একসাথে বদলে যাবে।
-
-## 2) WhatsApp সাপোর্ট নাম্বার / Support numbers
-
-**ফাইল:** `src/lib/brand.ts` → `SUPPORT` অবজেক্ট। শুধু `href`-এর ভেতরের ফোন নাম্বার বদলান:
-
-```
-https://api.whatsapp.com/send?phone=8801XXXXXXXXX
-```
-
-## 3) রঙ / Colors (theme)
-
-**ফাইল:** `src/styles.css` → উপরের `:root { ... }` ব্লক।
-
-| Token | কী কাজ করে |
-|---|---|
-| `--background` | পুরো সাইটের ব্যাকগ্রাউন্ড |
-| `--primary` | ব্র্যান্ড ভায়োলেট (বাটন, অ্যাক্টিভ ট্যাব) |
-| `--accent` | সায়ান (আইকন, হাইলাইট) |
-| `--gold` | দাম/প্রিমিয়াম ব্যাজের সোনালি রঙ |
-| `--success / --warning / --destructive` | সবুজ / হলুদ / লাল স্ট্যাটাস |
-
-`--gradient-primary` বদলালে সব গ্রেডিয়েন্ট বাটন একসাথে বদলাবে।
-
-## 4) ফন্ট / Fonts
-
-- **লোড হয়:** `src/routes/__root.tsx` → Google Fonts লিংক
-- **সেট হয়:** `src/styles.css` → `--font-display` (হেডলাইন/দাম), `--font-sans` (বডি), `--font-mono` (অর্ডার আইডি/নাম্বার)
-
-বর্তমান: **Unbounded** (display) · **Manrope** (body) · **JetBrains Mono** (IDs)
-
-## 5) লোগো / Logo
-
-- **সাইটের ভেতরের লোগো (SVG):** `src/components/brand-logo.tsx` — `BrandMark` কম্পোনেন্ট
-- **ব্রাউজার ট্যাব আইকন:** `public/favicon.png`, `public/favicon.ico`, `public/apple-touch-icon.png` — নিজের ছবি দিয়ে replace করলেই হবে
-
-## 6) হোমপেজের লেখা / Homepage text
-
-**ফাইল:** `src/routes/index.tsx`
-- হিরো হেডলাইন, সাবটাইটেল
-- `TICKER` array — চলমান (marquee) লেখাগুলো
-- "How it works" ৩টি স্টেপ
-- Trust কার্ড ৪টি
-
-## 7) Backend URL
-
-**ফাইল:** `src/lib/api.ts` → `DEFAULT_API_BASE_URL`, অথবা `.env`-এ `VITE_API_BASE_URL` দিন। Backend (aimarket-main) কোনো পরিবর্তন ছাড়াই আগের মতোই কানেক্ট হবে।
-
-## 8) Run / Deploy
-
-```bash
-bun install     # অথবা npm install
-bun run dev     # লোকালে চালাতে
-bun run build   # প্রোডাকশন বিল্ড
-```
+এই প্রজেক্টের **সব লেখা, কালার, স্টেপ, ফন্ট** নিচের ফাইলগুলো থেকে বদলানো যায়।
+কোড না জানলেও সমস্যা নেই — শুধু টেক্সট বদলে সেভ করুন।
 
 ---
 
-### Motion বন্ধ করতে চাইলে?
-কারো ডিভাইসে **Reduce Motion** অন থাকলে সব অ্যানিমেশন নিজে থেকেই বন্ধ হয়ে যায় — আলাদা কিছু করা লাগবে না।
+## 1. `src/lib/brand.ts` — দোকানের নাম / ট্যাগলাইন / WhatsApp
+- `name`, `nameAccent`, `nameRest` → লোগোর নাম
+- `tagline`, `description` → ট্যাগলাইন ও Google-এ যা দেখাবে
+- `SUPPORT` → WhatsApp সাপোর্ট নাম্বার
+
+## 2. `src/lib/site-config.ts` — ⭐ চেকআউটের সব কিছু (নতুন)
+- **`WALLETS`** → প্রতিটা ওয়ালেটের (bKash, Nagad, Easypaisa, JazzCash, Bank,
+  Binance, USDT) ব্র্যান্ড কালার, monogram, badge, আর **স্টেপ-বাই-স্টেপ পেমেন্ট গাইড**
+  (English `steps` + বাংলা `stepsBn`)। কালার বদলালে পুরো প্যানেলের থিম বদলে যাবে।
+- **`METHOD_CHANNELS`** → কোন গেটওয়েতে কোন ওয়ালেট দেখাবে
+- **`PROMO_TEXT`** → প্রোমো কোড বক্সের সব লেখা
+- **`CHECKOUT_TEXT`** → চেকআউট পেজের টাইটেল, হিন্ট, বাটনের লেখা
+
+## 3. `src/styles.css` — কালার / ফন্ট / এনিমেশন (Royal Obsidian theme)
+- `:root`-এর ভেতরে `--primary` (গোল্ড), `--accent`, `--background` ইত্যাদি
+- ফন্ট: `--font-display` (Fraunces), `--font-sans` (Albert Sans + Hind Siliguri)
+- ফন্ট বদলাতে চাইলে `src/routes/__root.tsx`-এর Google Fonts লিংকও আপডেট করুন
+- নিচের **PREMIUM V2** ব্লকে wallet-panel, holo-border, ticket, step-card স্টাইল
+
+## 4. Admin Panel থেকে (কোড ছাড়াই)
+- **Payment Settings** → bKash / Nagad / Easypaisa / JazzCash / Bank / Binance নাম্বার + instructions
+- **Promo Codes (নতুন)** → প্রোমো কোড বানান:
+  - `% Percent off` বা `Fixed amount off` (BDT/PKR/USDT আলাদা)
+  - Max uses, Min order amount, Start/Expiry date
+  - নির্দিষ্ট প্রোডাক্টে লিমিট করা যায়, on/off toggle
+- Products, Stock, Orders আগের মতোই
+
+## 5. Backend (aimarket repo) — নতুন API
+- `POST /api/promo/validate` → চেকআউটে কোড চেক করে
+- `POST /api/orders` এখন `promoCode` নেয়; ডিসকাউন্ট **সার্ভারে আবার ভেরিফাই** হয়
+- `/api/admin/promo-codes` → list / create / update / status / delete
+
+> ⚠️ ফ্রন্টএন্ড আর ব্যাকএন্ড **দুটোই** নতুন ভার্সনে ডিপ্লয় করতে হবে,
+> নাহলে প্রোমো কোড কাজ করবে না।

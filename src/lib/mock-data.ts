@@ -126,3 +126,37 @@ export const mockPaymentSettings: PaymentSettings = {
 };
 
 export const mockCategories = [{ id: "all", name: "All Products", icon: "🌐" }];
+
+export type PromoCode = {
+  id: string;
+  code: string;
+  description: string;
+  discountType: "percent" | "fixed";
+  percentOff: number;
+  fixedBDT: number;
+  fixedPKR: number;
+  fixedUSDT: number;
+  maxUses: number;
+  usedCount: number;
+  minAmountBDT: number;
+  minAmountPKR: number;
+  minAmountUSDT: number;
+  productIds: string[];
+  startsAt: string | null;
+  expiresAt: string | null;
+  isActive: boolean;
+  createdByNickname?: string;
+  createdAt?: string;
+};
+
+export type AppliedPromo = {
+  code: string;
+  description: string;
+  discountType: "percent" | "fixed";
+  percentOff: number;
+  discount: number;
+  originalAmount: number;
+  finalAmount: number;
+};
+
+export const mockPromoCodes: PromoCode[] = [];

@@ -11,23 +11,45 @@ import {
   priceForRegion,
   allowedPaymentMethods,
   priceRegionForPaymentMethod,
+  validatePromoCode,
 } from "@/lib/api";
+import { WALLETS, METHOD_CHANNELS, METHOD_META, PROMO_TEXT, CHECKOUT_TEXT, type WalletKey } from "@/lib/site-config";
 import { SiteHeader, SiteFooter } from "@/components/site-header";
 import { ProductLogo } from "@/components/product-logo";
 import { SupportPopups, SupportHelpSection } from "@/components/support-popups";
 import { ServerLoader } from "@/components/server-loader";
-import { Check, Copy, CreditCard, Loader2, ArrowLeft, PackageX, ShieldCheck } from "lucide-react";
-import type { PriceRegion } from "@/lib/mock-data";
+import type { AppliedPromo, PaymentSettings, PriceRegion } from "@/lib/mock-data";
+import {
+  BadgePercent, Check, Copy, Loader2, ArrowLeft, PackageX, ShieldCheck, Sparkles, Ticket, X,
+} from "lucide-react";
 
 export const Route = createFileRoute("/checkout/$productId")({ component: CheckoutPage, notFoundComponent: NotFoundProduct });
 type Method = "bangladesh" | "pakistan" | "binance";
+
+/* Map each channel to the account number stored in admin Payment Settings */
+function channelNumber(channel: WalletKey, payment?: PaymentSettings): string {
+  if (!payment) return "";
+  switch (channel) {
+    case "bKash": return payment.bangladesh.bkash;
+    case "Nagad": return payment.bangladesh.nagad;
+    case "Easypaisa": return payment.pakistan.easypaisa;
+    case "JazzCash": return payment.pakistan.jazzcash;
+    case "Bank Transfer": return payment.pakistan.bank;
+    case "Binance Pay": return payment.binance.payId;
+    default: return payment.binance.wallet; // USDT TRC20 / BEP20
+  }
+}
+function methodInstructions(method: Method, payment?: PaymentSettings): string {
+  if (!payment) return "";
+  return payment[method].instructions || "";
+}
 
 function NotFoundProduct() {
   return (
     <div className="min-h-screen">
       <SiteHeader />
       <div className="mx-auto max-w-3xl px-4 py-16 text-center">
-        <h1 className="font-display text-2xl font-bold">Product not found</h1>
+        <h1 className="display-luxe text-2xl font-bold">Product not found</h1>
         <p className="mt-2 text-muted-foreground">The product you're trying to buy doesn't exist.</p>
         <Link to="/products" className="btn-primary mt-6 inline-block rounded-xl px-6 py-3 text-sm font-semibold">Back to Products</Link>
       </div>
@@ -40,22 +62,28 @@ function CheckoutPage() {
   const { productId } = Route.useParams();
   const { data: product, isLoading } = useQuery({ queryKey: ["product", productId], queryFn: () => getProductById(productId) });
   const { data: payment } = useQuery({ queryKey: ["payment"], queryFn: getPaymentSettings });
+
   const [visitorRegion, setVisitorRegion] = useState<PriceRegion>("world");
   const [method, setMethod] = useState<Method>("binance");
+  const [channel, setChannel] = useState<WalletKey | "">("");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [contact, setContact] = useState("");
-  const [channel, setChannel] = useState("");
   const [txid, setTxid] = useState("");
   const [orderRef, setOrderRef] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  // Promo state
+  const [promoInput, setPromoInput] = useState("");
+  const [promo, setPromo] = useState<AppliedPromo | null>(null);
+  const [promoBusy, setPromoBusy] = useState(false);
+  const [promoShake, setPromoShake] = useState(false);
 
   useEffect(() => {
     getVisitorRegion().then((r) => {
       const region = r.region || "world";
       setVisitorRegion(region);
-      const methods = allowedPaymentMethods(region);
-      setMethod(methods[0]);
+      setMethod(allowedPaymentMethods(region)[0]);
       setChannel("");
     });
   }, []);
@@ -63,10 +91,41 @@ function CheckoutPage() {
   const availableMethods = useMemo(() => allowedPaymentMethods(visitorRegion), [visitorRegion]);
   const selectedPriceRegion = priceRegionForPaymentMethod(method);
   const price = product ? priceForRegion(product, selectedPriceRegion) : { amount: 0, currency: "USDT" as const };
+  const discount = promo ? Math.min(promo.discount, price.amount) : 0;
+  const total = Math.max(0, Math.round((price.amount - discount) * 100) / 100);
   const inStock = !!product && product.stock > 0;
-  const canSubmit = inStock && name.trim() && email.trim() && method && channel && txid.trim();
 
-  useEffect(() => { setChannel(""); }, [method]);
+  const infoDone = !!(name.trim() && email.trim());
+  const payDone = !!(channel && txid.trim());
+  const canSubmit = inStock && infoDone && payDone;
+
+  // Changing gateway resets the channel + re-validates promo against the new currency
+  useEffect(() => {
+    setChannel("");
+    if (promo && product) {
+      validatePromoCode(promo.code, product.id, priceRegionForPaymentMethod(method))
+        .then(setPromo)
+        .catch(() => { setPromo(null); toast.info("Promo removed — not valid for this payment region."); });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [method]);
+
+  async function applyPromo() {
+    if (!product || !promoInput.trim() || promoBusy) return;
+    setPromoBusy(true);
+    try {
+      const applied = await validatePromoCode(promoInput, product.id, selectedPriceRegion);
+      setPromo(applied);
+      setPromoInput("");
+      toast.success(`${PROMO_TEXT.appliedPrefix} · ${applied.code}`);
+    } catch (err) {
+      setPromoShake(true);
+      setTimeout(() => setPromoShake(false), 450);
+      toast.error(err instanceof Error ? err.message : PROMO_TEXT.invalidFallback);
+    } finally {
+      setPromoBusy(false);
+    }
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -81,13 +140,14 @@ function CheckoutPage() {
         customerName: name,
         customerEmail: email,
         contact,
-        amount: price.amount,
+        amount: total,
         currency: price.currency,
         priceRegion: selectedPriceRegion,
         paymentMethod: method,
         paymentChannel: channel,
         transactionId: txid,
         customerOrderRef: orderRef || undefined,
+        promoCode: promo?.code || "",
       });
       toast.success("Order submitted successfully!");
       navigate({
@@ -131,7 +191,7 @@ function CheckoutPage() {
             <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-destructive/15 text-destructive">
               <PackageX className="h-8 w-8" />
             </div>
-            <h1 className="mt-5 font-display text-2xl font-bold">Out of stock</h1>
+            <h1 className="display-luxe mt-5 text-2xl font-bold">Out of stock</h1>
             <p className="mt-2 text-muted-foreground">{product.name} is currently unavailable.</p>
             <Link to="/products" className="btn-primary mt-6 inline-flex items-center gap-2 rounded-xl px-6 py-3 text-sm font-semibold">
               <ArrowLeft className="h-4 w-4" /> Back to Products
@@ -143,6 +203,8 @@ function CheckoutPage() {
     );
   }
 
+  const wallet = channel ? WALLETS[channel] : null;
+
   return (
     <div className="min-h-screen">
       <SiteHeader />
@@ -151,66 +213,150 @@ function CheckoutPage() {
         <Link to="/products/$id" params={{ id: product.id }} className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground">
           <ArrowLeft className="h-4 w-4" /> Back to product
         </Link>
-        <div className="animate-rise">
-          <h1 className="mt-4 font-display text-3xl font-bold">Checkout</h1>
-          <p className="mt-1.5 max-w-2xl text-sm text-muted-foreground sm:text-base">
-            Send the money first with your preferred gateway, then paste the payment
-            reference here. Delivery unlocks after admin approval.
-          </p>
+
+        <div className="animate-rise mt-5 flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <span className="eyebrow">Checkout</span>
+            <h1 className="display-luxe mt-2 text-3xl font-bold sm:text-4xl">
+              {CHECKOUT_TEXT.title.split(" ")[0]} <em className="text-holo">{CHECKOUT_TEXT.title.split(" ").slice(1).join(" ")}</em>
+            </h1>
+            <p className="mt-2 max-w-2xl text-sm text-muted-foreground sm:text-base">{CHECKOUT_TEXT.subtitle}</p>
+            <p className="mt-0.5 max-w-2xl text-xs text-muted-foreground/80">{CHECKOUT_TEXT.subtitleBn}</p>
+          </div>
+          <ProgressRail infoDone={infoDone} payDone={payDone} />
         </div>
 
         <form onSubmit={handleSubmit} className="mt-8 grid gap-6 lg:grid-cols-[1.35fr_1fr]">
           <div className="stagger space-y-6">
-            <RegionCard region={visitorRegion} />
-
-            <Section step="01" title="Your information">
+            {/* ---- STEP 1: customer info ---- */}
+            <Section step="1" title={CHECKOUT_TEXT.infoTitle} done={infoDone}>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Full name" value={name} onChange={setName} placeholder="Your name" />
                 <Field label="Email" type="email" value={email} onChange={setEmail} placeholder="you@example.com" />
                 <Field className="sm:col-span-2" label="WhatsApp / Telegram (optional)" value={contact} onChange={setContact} placeholder="+8801XXXXXXXXX or @username" />
               </div>
+              <p className="mt-3 text-xs text-muted-foreground">{CHECKOUT_TEXT.infoHint}</p>
             </Section>
 
-            <Section step="02" title="Payment">
-              <div className="rounded-2xl border border-primary/25 bg-primary/6 p-5">
-                <div className="text-sm font-bold">Available payment gateways</div>
-                <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                  Bangladesh customers can use the Bangladesh gateway only. Pakistan and
-                  worldwide customers can choose Pakistan payment or Binance.
-                </p>
-                <MethodTabs methods={availableMethods} value={method} onChange={setMethod} />
-                {payment && (
-                  <div className="mt-5">
-                    {method === "bangladesh" && <PayBangladesh {...payment.bangladesh} amount={price.amount} currency={price.currency} channel={channel} setChannel={setChannel} />}
-                    {method === "pakistan" && <PayPakistan {...payment.pakistan} amount={price.amount} currency={price.currency} channel={channel} setChannel={setChannel} />}
-                    {method === "binance" && <PayBinance {...payment.binance} amount={price.amount} currency={price.currency} channel={channel} setChannel={setChannel} />}
-                    <div className="mt-5 grid gap-4 sm:grid-cols-2">
-                      <Field label={method === "binance" ? "Transaction Hash / Reference" : "Transaction ID"} value={txid} onChange={setTxid} placeholder="Paste reference" />
-                      <Field label="Your Order ID (optional)" value={orderRef} onChange={setOrderRef} placeholder="optional" />
-                    </div>
-                    <p className="mt-3 text-xs text-muted-foreground">
-                      Save this Transaction ID or Order ID — you can use it any time on <b className="text-foreground">Track Your Orders</b>.
-                    </p>
-                  </div>
-                )}
+            {/* ---- STEP 2: gateway + wallet ---- */}
+            <Section step="2" title={CHECKOUT_TEXT.payTitle} done={payDone}>
+              <p className="text-xs text-muted-foreground">{CHECKOUT_TEXT.payHint}</p>
+
+              {/* Gateway tabs */}
+              <div className="mt-4 grid gap-2 sm:grid-cols-3">
+                {availableMethods.map((m) => {
+                  const meta = METHOD_META[m];
+                  const active = method === m;
+                  return (
+                    <button key={m} type="button" onClick={() => setMethod(m)} data-active={active} className="wallet-cta px-4 py-3.5 text-left text-sm" style={{ ["--wallet" as string]: "var(--primary)", ["--wallet-2" as string]: "var(--accent)" }}>
+                      <span className="font-bold">{meta.flag} {meta.title}</span>
+                      <span className="mt-1 block text-xs text-muted-foreground">{meta.sub}</span>
+                      {active && (
+                        <span className="absolute right-3 top-3 grid h-5 w-5 animate-pop place-items-center rounded-full bg-gradient-primary">
+                          <Check className="h-3 w-3 text-primary-foreground" />
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
+
+              {/* Channel cards — each carries its wallet's brand colors */}
+              <div className="mt-4">
+                <div className="text-xs font-semibold text-muted-foreground">Select your wallet · আপনার ওয়ালেট বেছে নিন</div>
+                <div className="mt-2.5 grid gap-2 sm:grid-cols-3">
+                  {METHOD_CHANNELS[method].map((ch) => {
+                    const w = WALLETS[ch];
+                    return (
+                      <button key={ch} type="button" onClick={() => setChannel(ch)} data-active={channel === ch} className="wallet-cta flex items-center gap-3 px-3.5 py-3 text-left" style={{ ["--wallet" as string]: w.color, ["--wallet-2" as string]: w.color2, ["--wallet-ink" as string]: w.ink }}>
+                        <span className="wallet-chip h-9 w-9 rounded-xl text-xs">{w.monogram}</span>
+                        <span>
+                          <span className="block text-sm font-bold">{w.label}</span>
+                          <span className="block text-[11px] text-muted-foreground">{w.badge}</span>
+                        </span>
+                        {channel === ch && <Check className="ml-auto h-4 w-4 animate-pop" style={{ color: w.color }} />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* ---- Wallet-branded payment panel ---- */}
+              {wallet && (
+                <div key={channel} className="wallet-panel mt-5 p-5 sm:p-6" style={{ ["--wallet" as string]: wallet.color, ["--wallet-2" as string]: wallet.color2, ["--wallet-ink" as string]: wallet.ink }}>
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="wallet-chip text-sm">{wallet.monogram}</div>
+                      <div>
+                        <div className="text-base font-bold">{wallet.label} Checkout</div>
+                        <div className="text-xs text-muted-foreground">{wallet.numberLabel}</div>
+                      </div>
+                    </div>
+                    <span className="wallet-badge">{wallet.badge}</span>
+                  </div>
+
+                  {/* Big copyable number */}
+                  <CopyNumber value={channelNumber(channel as WalletKey, payment)} accent={wallet.color} />
+
+                  {/* Amount to send */}
+                  <div className="mt-3 flex items-center justify-between rounded-xl border border-white/8 bg-black/20 px-4 py-3">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Send exactly</span>
+                    <span className="font-mono text-lg font-bold" style={{ color: wallet.color2 }}>{formatMoney(total, price.currency)}</span>
+                  </div>
+
+                  {/* Step-by-step guide */}
+                  <div className="mt-5">
+                    <div className="mb-2.5 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.16em] text-muted-foreground">
+                      <Sparkles className="h-3.5 w-3.5" style={{ color: wallet.color }} /> How to pay · কিভাবে পে করবেন
+                    </div>
+                    <div className="space-y-2">
+                      {wallet.steps.map((st, i) => (
+                        <div key={i} className="step-card">
+                          <span className="step-dot">{i + 1}</span>
+                          <span className="text-sm leading-5">
+                            {st}
+                            {wallet.stepsBn[i] && <span className="mt-0.5 block text-xs text-muted-foreground">{wallet.stepsBn[i]}</span>}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {methodInstructions(method, payment) && (
+                    <p className="mt-4 rounded-xl border border-white/8 bg-black/15 px-4 py-3 text-xs leading-5 text-muted-foreground">
+                      {methodInstructions(method, payment)}
+                    </p>
+                  )}
+
+                  {/* Proof fields */}
+                  <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                    <Field label={wallet.proofLabel} value={txid} onChange={setTxid} placeholder={wallet.proofHint} />
+                    <Field label="Your Order ID (optional)" value={orderRef} onChange={setOrderRef} placeholder="optional reference" />
+                  </div>
+                  <p className="mt-3 text-xs text-muted-foreground">{CHECKOUT_TEXT.trackNote}</p>
+                </div>
+              )}
             </Section>
 
             <SupportHelpSection title="Need help before submitting?" />
 
-            <button
-              type="submit"
-              disabled={!canSubmit || submitting}
-              className="btn-primary inline-flex w-full items-center justify-center gap-2 rounded-xl px-6 py-4 text-sm font-bold"
-            >
-              {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <CreditCard className="h-4 w-4" />}
-              {submitting ? "Submitting order..." : "Submit order"}
+            <button type="submit" disabled={!canSubmit || submitting} className="btn-primary inline-flex w-full items-center justify-center gap-2 rounded-xl px-6 py-4 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-60">
+              {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
+              {submitting ? CHECKOUT_TEXT.submitBusy : CHECKOUT_TEXT.submitIdle}
             </button>
+            {!canSubmit && (
+              <p className="text-center text-xs text-muted-foreground">
+                {!infoDone ? "১ম স্টেপে নাম ও ইমেইল দিন" : !channel ? "একটি ওয়ালেট সিলেক্ট করুন" : "Transaction ID দিলে বাটন চালু হবে"}
+              </p>
+            )}
           </div>
 
+          {/* ---- Order ticket ---- */}
           <aside>
-            <div className="glass sticky top-24 animate-rise rounded-3xl p-6 [animation-delay:0.2s]">
-              <h2 className="text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">Order summary</h2>
+            <div className="ticket holo-border--animated sticky top-24 animate-rise p-6 [animation-delay:0.2s]">
+              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                <Ticket className="h-3.5 w-3.5" /> {CHECKOUT_TEXT.summaryTitle}
+              </div>
               <div className="mt-4 flex items-center gap-3">
                 <ProductLogo logoUrl={product.logoUrl} icon={product.icon} name={product.name} className="h-14 w-14 rounded-xl border border-border bg-white/5 text-2xl" emojiClassName="text-2xl" />
                 <div>
@@ -218,15 +364,48 @@ function CheckoutPage() {
                   <div className="text-xs uppercase tracking-wider text-muted-foreground">{product.category}</div>
                 </div>
               </div>
+
+              {/* Promo box */}
+              <div className={`mt-5 ${promoShake ? "promo-shake" : ""}`}>
+                {promo ? (
+                  <div className="promo-applied flex items-center justify-between gap-2 px-3.5 py-2.5">
+                    <span className="flex items-center gap-2 text-sm font-semibold text-success">
+                      <BadgePercent className="h-4 w-4" /> {promo.code}
+                      {promo.discountType === "percent" && <span className="text-xs font-normal">(-{promo.percentOff}%)</span>}
+                    </span>
+                    <button type="button" onClick={() => setPromo(null)} className="btn-ghost inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-semibold text-muted-foreground hover:text-foreground">
+                      <X className="h-3 w-3" /> {PROMO_TEXT.removeButton}
+                    </button>
+                  </div>
+                ) : (
+                  <div>
+                    <label className="text-xs font-semibold text-muted-foreground">{PROMO_TEXT.title} · {PROMO_TEXT.titleBn}</label>
+                    <div className="mt-1.5 flex gap-2">
+                      <input value={promoInput} onChange={(e) => setPromoInput(e.target.value.toUpperCase())} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); applyPromo(); } }} placeholder={PROMO_TEXT.placeholder} className="input-x w-full px-3.5 py-2.5 font-mono text-sm uppercase tracking-wider" />
+                      <button type="button" onClick={applyPromo} disabled={!promoInput.trim() || promoBusy} className="btn-primary shrink-0 rounded-xl px-4 py-2.5 text-xs font-bold disabled:opacity-60">
+                        {promoBusy ? PROMO_TEXT.applying : PROMO_TEXT.applyButton}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <div className="mt-5 space-y-2.5 text-sm">
                 <Row label="Subtotal" value={formatMoney(price.amount, price.currency)} />
+                {discount > 0 && (
+                  <div className="flex items-center justify-between text-success">
+                    <span>{PROMO_TEXT.savingsLabel} ({promo?.code})</span>
+                    <span className="font-semibold">− {formatMoney(discount, price.currency)}</span>
+                  </div>
+                )}
                 <Row label="Service fee" value={formatMoney(0, price.currency)} />
-                <div className="my-3 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
-                <Row label="Total" value={formatMoney(price.amount, price.currency)} bold />
+                <div className="ticket-divider" />
+                <Row label="Total" value={formatMoney(total, price.currency)} bold />
               </div>
+
               <div className="mt-5 flex items-start gap-2 rounded-xl border border-success/25 bg-success/8 p-3.5 text-xs leading-5 text-success">
                 <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
-                <span>Account / instruction is delivered on your order page after admin approval.</span>
+                <span>{CHECKOUT_TEXT.guaranteeNote}</span>
               </div>
             </div>
           </aside>
@@ -237,63 +416,36 @@ function CheckoutPage() {
   );
 }
 
-function RegionCard({ region }: { region: PriceRegion }) {
-  const data =
-    region === "bd"
-      ? ["🇧🇩", "Bangladesh payment", "BDT price active. bKash / Nagad gateway is available."]
-      : region === "pk"
-        ? ["🇵🇰", "Pakistan / Binance payment", "PKR payment and Binance gateway are available."]
-        : ["🌍", "Worldwide payment", "Pakistan payment and Binance gateway are available."];
+function ProgressRail({ infoDone, payDone }: { infoDone: boolean; payDone: boolean }) {
+  const states: Array<"done" | "active" | "todo"> = [
+    infoDone ? "done" : "active",
+    payDone ? "done" : infoDone ? "active" : "todo",
+    "todo",
+  ];
   return (
-    <div className="glass rounded-3xl p-5">
-      <div className="flex items-center gap-4">
-        <div className="grid h-12 w-12 place-items-center rounded-2xl border border-border bg-white/5 text-2xl">{data[0]}</div>
-        <div>
-          <div className="font-bold">{data[1]}</div>
-          <div className="text-sm text-muted-foreground">{data[2]}</div>
+    <div className="progress-rail w-full max-w-xs animate-rise [animation-delay:0.1s]">
+      {CHECKOUT_TEXT.steps.map((label, i) => (
+        <div key={label} className="contents">
+          {i > 0 && <span className="progress-line" data-state={states[i - 1] === "done" ? "done" : undefined} />}
+          <div className="flex flex-col items-center gap-1">
+            <span className="progress-node" data-state={states[i] === "todo" ? undefined : states[i]}>
+              {states[i] === "done" ? <Check className="h-3.5 w-3.5" /> : i + 1}
+            </span>
+            <span className="whitespace-nowrap text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</span>
+          </div>
         </div>
-      </div>
+      ))}
     </div>
   );
 }
 
-function MethodTabs({ methods, value, onChange }: { methods: Method[]; value: Method; onChange: (m: Method) => void }) {
-  const label: Record<Method, string> = { bangladesh: "🇧🇩 Bangladesh", pakistan: "🇵🇰 Pakistan", binance: "🟡 Binance" };
-  const sub: Record<Method, string> = { bangladesh: "bKash / Nagad", pakistan: "Easypaisa / JazzCash / Bank", binance: "USDT / Binance Pay" };
-  return (
-    <div className="mt-4 grid gap-2 sm:grid-cols-2">
-      {methods.map((m) => {
-        const active = value === m;
-        return (
-          <button
-            key={m}
-            type="button"
-            onClick={() => onChange(m)}
-            className={`relative rounded-2xl border px-4 py-3.5 text-left text-sm transition-all duration-300 ${
-              active
-                ? "border-primary/70 bg-primary/12 shadow-glow"
-                : "border-border bg-white/4 hover:border-primary/40 hover:bg-white/6"
-            }`}
-          >
-            <span className="font-bold">{label[m]}</span>
-            <span className="mt-1 block text-xs text-muted-foreground">{sub[m]}</span>
-            {active && (
-              <span className="absolute right-3 top-3 grid h-5 w-5 place-items-center rounded-full bg-gradient-primary animate-pop">
-                <Check className="h-3 w-3 text-primary-foreground" />
-              </span>
-            )}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-function Section({ step, title, children }: { step: string; title: string; children: ReactNode }) {
+function Section({ step, title, done, children }: { step: string; title: string; done?: boolean; children: ReactNode }) {
   return (
     <div className="glass rounded-3xl p-6">
       <div className="flex items-center gap-3">
-        <span className="grid h-8 w-8 place-items-center rounded-lg bg-gradient-primary font-display text-xs font-bold text-primary-foreground shadow-glow">{step}</span>
+        <span className={`display-luxe grid h-8 w-8 place-items-center rounded-lg text-xs font-bold transition-all ${done ? "bg-success/18 text-success" : "bg-gradient-primary text-primary-foreground shadow-glow"}`}>
+          {done ? <Check className="h-4 w-4" /> : step}
+        </span>
         <h2 className="text-sm font-bold uppercase tracking-[0.16em] text-foreground">{title}</h2>
       </div>
       <div className="mt-5">{children}</div>
@@ -301,7 +453,7 @@ function Section({ step, title, children }: { step: string; title: string; child
   );
 }
 
-function Field({ label, value, onChange, placeholder, type = "text", className = "" }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; type?: string; className?: string; }) {
+function Field({ label, value, onChange, placeholder, type = "text", className = "" }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; type?: string; className?: string }) {
   return (
     <label className={`block ${className}`}>
       <span className="text-xs font-semibold text-muted-foreground">{label}</span>
@@ -314,92 +466,26 @@ function Row({ label, value, bold }: { label: string; value: string; bold?: bool
   return (
     <div className={`flex items-center justify-between ${bold ? "text-base font-bold" : "text-muted-foreground"}`}>
       <span>{label}</span>
-      <span className={bold ? "font-display text-gold-gradient" : "text-foreground"}>{value}</span>
+      <span className={bold ? "display-luxe text-gold-gradient text-lg" : "text-foreground"}>{value}</span>
     </div>
   );
 }
 
-function CopyChip({ value }: { value: string }) {
+function CopyNumber({ value, accent }: { value: string; accent: string }) {
+  const [flashed, setFlashed] = useState(false);
+  function copy() {
+    if (!value) return;
+    navigator.clipboard.writeText(value);
+    setFlashed(true);
+    setTimeout(() => setFlashed(false), 650);
+    toast.success("Number copied — অ্যাপে পেস্ট করুন");
+  }
   return (
-    <button
-      type="button"
-      onClick={() => { navigator.clipboard.writeText(value); toast.success("Copied"); }}
-      className="btn-ghost inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-semibold text-muted-foreground hover:text-foreground"
-    >
-      <Copy className="h-3 w-3" /> Copy
-    </button>
-  );
-}
-
-function ChannelPicker({ options, value, onChange }: { options: string[]; value: string; onChange: (v: string) => void }) {
-  return (
-    <div className="mt-3 flex flex-wrap gap-2">
-      {options.map((o) => (
-        <button key={o} type="button" onClick={() => onChange(o)} data-active={value === o} className="chip rounded-full px-3.5 py-1.5 text-xs font-semibold">
-          {o}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function NumberLine({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="copy-row text-sm">
-      <span className="text-muted-foreground">{label}</span>
-      <span className="flex items-center gap-2">
-        <span className="font-mono font-semibold tracking-wide">{value || "Not set"}</span>
-        {value && <CopyChip value={value} />}
+    <button type="button" onClick={copy} className={`mt-4 flex w-full items-center justify-between gap-3 rounded-2xl border border-white/10 bg-black/25 px-4 py-3.5 text-left transition-transform active:scale-[0.99] ${flashed ? "copy-flash" : ""}`}>
+      <span className="wallet-number">{value || "Not set — admin will add"}</span>
+      <span className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-bold" style={{ background: `${accent}22`, color: accent }}>
+        {flashed ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />} {flashed ? "Copied" : "Tap to copy"}
       </span>
-    </div>
-  );
-}
-
-function PayBangladesh(p: { bkash: string; nagad: string; instructions: string; amount: number; currency: string; channel: string; setChannel: (v: string) => void }) {
-  return (
-    <div>
-      <div className="mb-1 text-sm font-bold">🇧🇩 Bangladesh payment</div>
-      <p className="text-xs leading-5 text-muted-foreground">{p.instructions}</p>
-      <div className="mt-3 space-y-2">
-        <NumberLine label="bKash (Send Money)" value={p.bkash} />
-        <NumberLine label="Nagad (Send Money)" value={p.nagad} />
-        <NumberLine label="Amount" value={formatMoney(p.amount, p.currency as never)} />
-      </div>
-      <div className="mt-3 text-xs font-semibold text-muted-foreground">Select the channel you used:</div>
-      <ChannelPicker options={["bKash", "Nagad"]} value={p.channel} onChange={p.setChannel} />
-    </div>
-  );
-}
-
-function PayPakistan(p: { easypaisa: string; jazzcash: string; bank: string; instructions: string; amount: number; currency: string; channel: string; setChannel: (v: string) => void }) {
-  return (
-    <div>
-      <div className="mb-1 text-sm font-bold">🇵🇰 Pakistan payment</div>
-      <p className="text-xs leading-5 text-muted-foreground">{p.instructions}</p>
-      <div className="mt-3 space-y-2">
-        <NumberLine label="Easypaisa" value={p.easypaisa} />
-        <NumberLine label="JazzCash" value={p.jazzcash} />
-        <NumberLine label="Bank" value={p.bank} />
-        <NumberLine label="Amount" value={formatMoney(p.amount, p.currency as never)} />
-      </div>
-      <div className="mt-3 text-xs font-semibold text-muted-foreground">Select the channel you used:</div>
-      <ChannelPicker options={["Easypaisa", "JazzCash", "Bank Transfer"]} value={p.channel} onChange={p.setChannel} />
-    </div>
-  );
-}
-
-function PayBinance(p: { payId: string; wallet: string; instructions: string; amount: number; currency: string; channel: string; setChannel: (v: string) => void }) {
-  return (
-    <div>
-      <div className="mb-1 text-sm font-bold">🟡 Binance / worldwide</div>
-      <p className="text-xs leading-5 text-muted-foreground">{p.instructions}</p>
-      <div className="mt-3 space-y-2">
-        <NumberLine label="Binance Pay ID" value={p.payId} />
-        <NumberLine label="USDT Wallet" value={p.wallet} />
-        <NumberLine label="Amount" value={formatMoney(p.amount, p.currency as never)} />
-      </div>
-      <div className="mt-3 text-xs font-semibold text-muted-foreground">Select the channel you used:</div>
-      <ChannelPicker options={["Binance Pay", "USDT TRC20", "USDT BEP20"]} value={p.channel} onChange={p.setChannel} />
-    </div>
+    </button>
   );
 }
