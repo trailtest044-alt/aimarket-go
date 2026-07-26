@@ -15,7 +15,6 @@ import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as AdminLoginRouteImport } from './routes/admin.login'
 import { Route as AdminProductsRouteImport } from './routes/admin.products'
 import { Route as AdminPaymentSettingsRouteImport } from './routes/admin.payment-settings'
-import { Route as AdminPromoCodesRouteImport } from './routes/admin.promo-codes'
 import { Route as AdminStockRouteImport } from './routes/admin.stock'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
 import { Route as AdminTrackOrdersRouteImport } from './routes/admin.track-orders'
@@ -38,7 +37,6 @@ const AdminIndexRoute = AdminIndexRouteImport.update({ id: '/', path: '/', getPa
 const AdminLoginRoute = AdminLoginRouteImport.update({ id: '/login', path: '/login', getParentRoute: () => AdminRoute } as any)
 const AdminProductsRoute = AdminProductsRouteImport.update({ id: '/products', path: '/products', getParentRoute: () => AdminRoute } as any)
 const AdminPaymentSettingsRoute = AdminPaymentSettingsRouteImport.update({ id: '/payment-settings', path: '/payment-settings', getParentRoute: () => AdminRoute } as any)
-const AdminPromoCodesRoute = AdminPromoCodesRouteImport.update({ id: '/promo-codes', path: '/promo-codes', getParentRoute: () => AdminRoute } as any)
 const AdminStockRoute = AdminStockRouteImport.update({ id: '/stock', path: '/stock', getParentRoute: () => AdminRoute } as any)
 const AdminUsersRoute = AdminUsersRouteImport.update({ id: '/users', path: '/users', getParentRoute: () => AdminRoute } as any)
 const AdminTrackOrdersRoute = AdminTrackOrdersRouteImport.update({ id: '/track-orders', path: '/track-orders', getParentRoute: () => AdminRoute } as any)
@@ -59,7 +57,6 @@ const AdminRouteWithChildren = AdminRoute._addFileChildren({
   AdminLoginRoute,
   AdminOrdersRoute: AdminOrdersRouteWithChildren,
   AdminPaymentSettingsRoute,
-  AdminPromoCodesRoute,
   AdminProductsRoute,
   AdminStockRoute,
   AdminUsersRoute,
@@ -82,7 +79,6 @@ export interface FileRoutesByFullPath {
   '/admin/login': typeof AdminLoginRoute
   '/admin/products': typeof AdminProductsRoute
   '/admin/payment-settings': typeof AdminPaymentSettingsRoute
-  '/admin/promo-codes': typeof AdminPromoCodesRoute
   '/admin/stock': typeof AdminStockRoute
   '/admin/users': typeof AdminUsersRoute
   '/admin/track-orders': typeof AdminTrackOrdersRoute
@@ -117,7 +113,6 @@ declare module '@tanstack/react-router' {
     '/admin/login': { id: '/admin/login'; path: '/login'; fullPath: '/admin/login'; preLoaderRoute: typeof AdminLoginRouteImport; parentRoute: typeof AdminRoute }
     '/admin/products': { id: '/admin/products'; path: '/products'; fullPath: '/admin/products'; preLoaderRoute: typeof AdminProductsRouteImport; parentRoute: typeof AdminRoute }
     '/admin/payment-settings': { id: '/admin/payment-settings'; path: '/payment-settings'; fullPath: '/admin/payment-settings'; preLoaderRoute: typeof AdminPaymentSettingsRouteImport; parentRoute: typeof AdminRoute }
-    '/admin/promo-codes': { id: '/admin/promo-codes'; path: '/promo-codes'; fullPath: '/admin/promo-codes'; preLoaderRoute: typeof AdminPromoCodesRouteImport; parentRoute: typeof AdminRoute }
     '/admin/stock': { id: '/admin/stock'; path: '/stock'; fullPath: '/admin/stock'; preLoaderRoute: typeof AdminStockRouteImport; parentRoute: typeof AdminRoute }
     '/admin/users': { id: '/admin/users'; path: '/users'; fullPath: '/admin/users'; preLoaderRoute: typeof AdminUsersRouteImport; parentRoute: typeof AdminRoute }
     '/admin/track-orders': { id: '/admin/track-orders'; path: '/track-orders'; fullPath: '/admin/track-orders'; preLoaderRoute: typeof AdminTrackOrdersRouteImport; parentRoute: typeof AdminRoute }

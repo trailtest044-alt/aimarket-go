@@ -15,9 +15,6 @@ import {
   type DashboardStats,
   type ProductSalesRow,
   type ActivityLog,
-  type PromoCode,
-  type AppliedPromo,
-  mockPromoCodes,
 } from "./mock-data";
 
 const DEFAULT_API_BASE_URL = "https://aimarket-u138.onrender.com/api";
@@ -240,10 +237,10 @@ export async function searchAdminOrders(query: string, status?: Order["status"] 
   return data.orders.map(orderToFrontend);
 }
 export async function getOrderById(id: string): Promise<Order | null> { if (IS_MOCK_MODE) { const list = await getOrders(); return list.find((o) => o.id === id) ?? null; } const token = getOrderToken(id); if (!token) return null; try { const data = await http<{ order: BackendOrder }>(`/orders/${id}/status?token=${encodeURIComponent(token)}`); return orderToFrontend(data.order); } catch { return null; } }
-export async function createOrder(o: Omit<Order, "id" | "status" | "createdAt"> & { promoCode?: string }): Promise<Order> {
+export async function createOrder(o: Omit<Order, "id" | "status" | "createdAt">): Promise<Order> {
   if (IS_MOCK_MODE) { const list = await getOrders(); const order: Order = { ...o, id: `ORD-${Math.floor(1000 + Math.random() * 9000)}`, status: "pending", createdAt: new Date().toISOString() }; save(STORAGE_KEYS.orders, [order, ...list]); return delay(order); }
   const productBackendId = await resolveBackendProductId(o.productId); const paymentNote = `Channel: ${o.paymentChannel}${o.customerOrderRef ? `; Reference: ${o.customerOrderRef}` : ""}`;
-  const data = await http<{ order: { orderId: string; status: Order["status"]; productTitle: string; amount: number; currency: CurrencyCode; priceRegion: PriceRegion; paymentMethod: Order["paymentMethod"]; transactionId?: string; customerOrderRef?: string }; accessToken: string }>("/orders", { method: "POST", body: JSON.stringify({ productId: productBackendId, customer: { name: o.customerName, email: o.customerEmail, whatsapp: o.contact || "" }, paymentMethod: o.paymentMethod, priceRegion: priceRegionForPaymentMethod(o.paymentMethod), transactionId: o.transactionId, customerOrderRef: o.customerOrderRef || "", paymentNote, promoCode: o.promoCode || "" }) });
+  const data = await http<{ order: { orderId: string; status: Order["status"]; productTitle: string; amount: number; currency: CurrencyCode; priceRegion: PriceRegion; paymentMethod: Order["paymentMethod"]; transactionId?: string; customerOrderRef?: string }; accessToken: string }>("/orders", { method: "POST", body: JSON.stringify({ productId: productBackendId, customer: { name: o.customerName, email: o.customerEmail, whatsapp: o.contact || "" }, paymentMethod: o.paymentMethod, priceRegion: priceRegionForPaymentMethod(o.paymentMethod), transactionId: o.transactionId, customerOrderRef: o.customerOrderRef || "", paymentNote }) });
   saveOrderToken(data.order.orderId, data.accessToken);
   return { ...o, id: data.order.orderId, productName: data.order.productTitle || o.productName, amount: money(data.order.amount || o.amount), currency: data.order.currency, priceRegion: data.order.priceRegion, status: data.order.status, createdAt: new Date().toISOString() };
 }
@@ -303,50 +300,3 @@ export async function resetAdminPassword(id: string, password: string): Promise<
 export async function changeOwnPassword(password: string): Promise<AdminUser> { const data = await http<{ admin: AdminUser }>("/admin/users/me/password", { method: "PATCH", body: JSON.stringify({ password }) }); return data.admin; }
 export async function setAdminStatus(id: string, isActive: boolean): Promise<AdminUser> { const data = await http<{ admin: AdminUser }>(`/admin/users/${id}/status`, { method: "PATCH", body: JSON.stringify({ isActive }) }); return data.admin; }
 export async function getDashboard(): Promise<{ stats: DashboardStats; salesByProduct: ProductSalesRow[]; recentOrders: BackendOrder[]; recentActivity: ActivityLog[]; lowStock: { productId: string; productName: string; available: number }[] }> { return http("/admin/dashboard"); }
-
-
-/* ============================ PROMO CODES ============================ */
-export async function validatePromoCode(code: string, productId: string, priceRegion: PriceRegion): Promise<AppliedPromo> {
-  if (IS_MOCK_MODE) {
-    const promos = load<PromoCode[]>("mp_promo_codes", mockPromoCodes);
-    const promo = promos.find((p) => p.code.toUpperCase() === code.trim().toUpperCase() && p.isActive);
-    if (!promo) throw new Error("This promo code is not valid.");
-    return delay({ code: promo.code, description: promo.description, discountType: promo.discountType, percentOff: promo.percentOff, discount: 0, originalAmount: 0, finalAmount: 0 });
-  }
-  const backendId = await resolveBackendProductId(productId);
-  return http<AppliedPromo & { valid: boolean }>("/promo/validate", { method: "POST", body: JSON.stringify({ code: code.trim(), productId: backendId, priceRegion }) });
-}
-
-type BackendPromo = Omit<PromoCode, "id"> & { _id: string };
-const promoFromBackend = (p: BackendPromo): PromoCode => ({ ...p, id: p._id, productIds: (p.productIds || []).map(String) });
-
-export async function getPromoCodes(): Promise<PromoCode[]> {
-  if (IS_MOCK_MODE) return delay(load<PromoCode[]>("mp_promo_codes", mockPromoCodes));
-  const data = await http<{ promos: BackendPromo[] }>("/admin/promo-codes");
-  return data.promos.map(promoFromBackend);
-}
-
-export type PromoInput = Omit<PromoCode, "id" | "usedCount" | "createdByNickname" | "createdAt">;
-
-export async function createPromoCode(input: PromoInput): Promise<PromoCode> {
-  if (IS_MOCK_MODE) { const list = load<PromoCode[]>("mp_promo_codes", mockPromoCodes); const promo: PromoCode = { ...input, id: `PR-${Date.now()}`, usedCount: 0, createdAt: new Date().toISOString() }; save("mp_promo_codes", [promo, ...list]); return delay(promo); }
-  const data = await http<{ promo: BackendPromo }>("/admin/promo-codes", { method: "POST", body: JSON.stringify(input) });
-  return promoFromBackend(data.promo);
-}
-
-export async function updatePromoCode(id: string, input: PromoInput): Promise<PromoCode> {
-  if (IS_MOCK_MODE) { const list = load<PromoCode[]>("mp_promo_codes", mockPromoCodes).map((p) => (p.id === id ? { ...p, ...input } : p)); save("mp_promo_codes", list); return delay(list.find((p) => p.id === id)!); }
-  const data = await http<{ promo: BackendPromo }>(`/admin/promo-codes/${id}`, { method: "PUT", body: JSON.stringify(input) });
-  return promoFromBackend(data.promo);
-}
-
-export async function setPromoCodeStatus(id: string, isActive: boolean): Promise<PromoCode> {
-  if (IS_MOCK_MODE) { const list = load<PromoCode[]>("mp_promo_codes", mockPromoCodes).map((p) => (p.id === id ? { ...p, isActive } : p)); save("mp_promo_codes", list); return delay(list.find((p) => p.id === id)!); }
-  const data = await http<{ promo: BackendPromo }>(`/admin/promo-codes/${id}/status`, { method: "PATCH", body: JSON.stringify({ isActive }) });
-  return promoFromBackend(data.promo);
-}
-
-export async function deletePromoCode(id: string): Promise<void> {
-  if (IS_MOCK_MODE) { save("mp_promo_codes", load<PromoCode[]>("mp_promo_codes", mockPromoCodes).filter((p) => p.id !== id)); return delay(undefined); }
-  await http(`/admin/promo-codes/${id}`, { method: "DELETE" });
-}

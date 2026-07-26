@@ -55,7 +55,7 @@ function AdminTrackOrders() {
     if (value === "delivered") return "bg-emerald-100 text-emerald-700 ring-emerald-200";
     if (value === "approved") return "bg-sky-100 text-sky-700 ring-sky-200";
     if (value === "rejected") return "bg-rose-100 text-rose-700 ring-rose-200";
-    return "bg-warning/12 text-warning ring-warning/30";
+    return "bg-amber-100 text-amber-700 ring-amber-200";
   }
 
   return (
@@ -63,7 +63,7 @@ function AdminTrackOrders() {
       <div className="glass rounded-3xl p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+            <div className="flex items-center gap-2 text-sm font-semibold text-slate-800">
               <ClipboardList className="h-4 w-4 text-primary" /> Advanced order search
             </div>
             <p className="mt-2 text-sm text-muted-foreground">
@@ -107,7 +107,7 @@ function AdminTrackOrders() {
           </button>
         </div>
 
-        <div className="mt-4 rounded-2xl bg-white/4 px-4 py-3 text-xs text-muted-foreground ring-1 ring-border/70">
+        <div className="mt-4 rounded-2xl bg-white/50 px-4 py-3 text-xs text-muted-foreground ring-1 ring-border/70">
           Admin results: <span className="font-semibold text-foreground">{adminSearch.data?.length || 0}</span>
           {" "}• Code fallback: <span className="font-semibold text-foreground">{publicCodeSearch.data?.length || 0}</span>
           {" "}• Showing: <span className="font-semibold text-foreground">{orders.length}</span>
