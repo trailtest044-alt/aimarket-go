@@ -11,6 +11,7 @@ import {
   type PaymentSettings,
   type PriceRegion,
   type CurrencyCode,
+  type DeliveryMode,
   type AdminUser,
   type DashboardStats,
   type ProductSalesRow,
@@ -31,6 +32,7 @@ const STORAGE_KEYS = {
   products: "mp_products",
   orders: "mp_orders",
   stock: "mp_stock",
+  deliveries: "mp_deliveries",
   payment: "mp_payment_settings",
   admin: "mp_admin_auth",
   token: "mp_admin_token",
@@ -72,7 +74,7 @@ type BackendProduct = {
   _id: string; title: string; slug: string; description?: string; shortDescription?: string; category?: string; imageUrl?: string;
   badge?: string; icon?: string; priceBDT?: number; pricePKR?: number; priceUSDT?: number; worldwideCurrency?: "USDT" | "USD";
   originalPriceBDT?: number; originalPricePKR?: number; originalPriceUSDT?: number; features?: string[];
-  deliveryMethod?: string; terms?: string; isActive?: boolean; sortOrder?: number; availableStock?: number;
+  deliveryMode?: DeliveryMode; deliveryMethod?: string; terms?: string; isActive?: boolean; sortOrder?: number; availableStock?: number;
   createdByNickname?: string; updatedByNickname?: string; displayPrice?: { amount: number; currency: CurrencyCode; region: PriceRegion };
 };
 
@@ -86,9 +88,10 @@ type BackendOrder = {
   status: Order["status"]; createdAt?: string; reviewedAt?: string; rejectReason?: string | null; deliveryAvailable?: boolean;
   approvedByNickname?: string; deliveredByNickname?: string; rejectedByNickname?: string; reviewedByNickname?: string;
 };
-type BackendStock = { _id: string; productId?: string | { _id?: string; title?: string; slug?: string }; status: "available" | "reserved" | "delivered" | "disabled"; adminNote?: string; createdAt?: string; payload?: { email?: string; password?: string; instruction?: string; videoUrl?: string; imageUrl?: string }; createdByNickname?: string; };
+type BackendStock = { _id: string; productId?: string | { _id?: string; title?: string; slug?: string }; status: "available" | "reserved" | "delivered" | "disabled"; adminNote?: string; createdAt?: string; payload?: { deliveryMode?: DeliveryMode; email?: string; password?: string; activationCode?: string; clientId?: string; refreshToken?: string; instruction?: string; videoUrl?: string; imageUrl?: string }; createdByNickname?: string; };
 
-export type DeliveryPayload = { email?: string; password?: string; instruction?: string; instructions?: string; videoUrl?: string; imageUrl?: string; extra?: Record<string, unknown>; };
+export type DeliveryPayload = { deliveryMode?: DeliveryMode; email?: string; password?: string; activationCode?: string; instruction?: string; instructions?: string; videoUrl?: string; imageUrl?: string; canFetchLoginCode?: boolean; extra?: Record<string, unknown>; };
+export type LoginCodeResult = { code: string; subject?: string; receivedAt?: string; preview?: string };
 
 function slugify(value: string) { return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)+/g, "") || `product-${Date.now()}`; }
 function money(value: unknown): number { const n = Number(value); return Number.isFinite(n) ? n : 0; }
@@ -131,6 +134,7 @@ function productToFrontend(p: BackendProduct): Product {
     shortDescription: p.shortDescription || p.description || "",
     description: p.description || p.shortDescription || "",
     features: Array.isArray(p.features) ? p.features : [],
+    deliveryMode: p.deliveryMode || "credentials",
     deliveryMethod: p.deliveryMethod || "Account login details will be delivered after admin approval.",
     terms: p.terms || "Do not change password/recovery info unless instructed by admin.",
     stock: money(p.availableStock ?? 0),
@@ -147,7 +151,7 @@ function productToBackend(p: Product) {
     imageUrl: p.logoUrl || "", badge: p.badge || "", icon: p.icon || "✨",
     priceBDT: money(p.priceBDT), pricePKR: money(p.pricePKR), priceUSDT: money(p.priceUSDT), worldwideCurrency: p.worldwideCurrency || "USDT",
     originalPriceBDT: money(p.originalPriceBDT), originalPricePKR: money(p.originalPricePKR), originalPriceUSDT: money(p.originalPriceUSDT),
-    features: p.features || [], deliveryMethod: p.deliveryMethod || "", terms: p.terms || "", isActive: true, sortOrder: Number(p.sortOrder || 0),
+    features: p.features || [], deliveryMode: p.deliveryMode || "credentials", deliveryMethod: p.deliveryMethod || "", terms: p.terms || "", isActive: true, sortOrder: Number(p.sortOrder || 0),
   };
 }
 function getAccount(method: BackendPaymentMethod | undefined, labelIncludes: string) { return method?.accounts?.find((a) => (a.label || "").toLowerCase().includes(labelIncludes))?.value || ""; }
@@ -170,8 +174,20 @@ function orderToFrontend(o: BackendOrder): Order {
     status: o.status, createdAt: o.createdAt || new Date().toISOString(), approvedByNickname: o.approvedByNickname || "", deliveredByNickname: o.deliveredByNickname || "", rejectedByNickname: o.rejectedByNickname || "", reviewedByNickname: o.reviewedByNickname || "",
   };
 }
-function stockToFrontend(s: BackendStock): StockItem { const productId = typeof s.productId === "object" ? (s.productId.slug || s.productId._id || "") : (s.productId || ""); return { id: s._id, productId, email: s.payload?.email || "Encrypted", password: s.payload?.password ? "••••••••" : "Encrypted", instructions: s.payload?.instruction || s.adminNote || "Encrypted delivery item", videoUrl: s.payload?.videoUrl, imageUrl: s.payload?.imageUrl, status: s.status === "available" ? "available" : "delivered", createdAt: s.createdAt || new Date().toISOString(), addedBy: s.createdByNickname || "" }; }
+function stockToFrontend(s: BackendStock): StockItem { const productId = typeof s.productId === "object" ? (s.productId.slug || s.productId._id || "") : (s.productId || ""); return { id: s._id, productId, deliveryMode: s.payload?.deliveryMode || "credentials", email: s.payload?.email || "Encrypted", password: s.payload?.password ? "••••••••" : "Encrypted", activationCode: s.payload?.activationCode ? "••••••••" : undefined, loginClientId: s.payload?.clientId ? "saved" : undefined, loginRefreshToken: s.payload?.refreshToken ? "saved" : undefined, instructions: s.payload?.instruction || s.adminNote || "Encrypted delivery item", videoUrl: s.payload?.videoUrl, imageUrl: s.payload?.imageUrl, status: s.status === "available" ? "available" : "delivered", createdAt: s.createdAt || new Date().toISOString(), addedBy: s.createdByNickname || "" }; }
 async function resolveBackendProductId(productIdOrSlug: string): Promise<string> { if (objectIdRe.test(productIdOrSlug)) return productIdOrSlug; const product = await getProductById(productIdOrSlug); return product?.backendId || productIdOrSlug; }
+function stockToDelivery(s: StockItem): DeliveryPayload {
+  return {
+    deliveryMode: s.deliveryMode || "credentials",
+    email: s.email,
+    password: s.deliveryMode === "credentials" ? s.password : undefined,
+    activationCode: s.deliveryMode === "activation_code" ? s.activationCode : undefined,
+    instruction: s.instructions,
+    videoUrl: s.videoUrl,
+    imageUrl: s.imageUrl,
+    canFetchLoginCode: s.deliveryMode === "login_code",
+  };
+}
 
 export async function getVisitorRegion(): Promise<{ region: PriceRegion; country?: string }> {
   // A manual choice always wins, so a BD buyer can force ৳/bKash regardless of IP.
@@ -276,9 +292,21 @@ export async function createOrder(o: Omit<Order, "id" | "status" | "createdAt"> 
   saveOrderToken(data.order.orderId, data.accessToken);
   return { ...o, id: data.order.orderId, productName: data.order.productTitle || o.productName, amount: money(data.order.amount || o.amount), currency: data.order.currency, priceRegion: data.order.priceRegion, status: data.order.status, createdAt: new Date().toISOString() };
 }
-export async function updateOrderStatus(id: string, status: Order["status"]): Promise<Order | null> { if (IS_MOCK_MODE) { const list = await getOrders(); const next = list.map((o) => (o.id === id ? { ...o, status } : o)); save(STORAGE_KEYS.orders, next); return delay(next.find((o) => o.id === id) ?? null); } if (status === "approved") { const data = await http<{ order: BackendOrder }>(`/admin/orders/${id}/approve`, { method: "POST" }); return orderToFrontend(data.order); }
+function allocateMockDelivery(order: Order) {
+  const deliveries = load<Record<string, DeliveryPayload>>(STORAGE_KEYS.deliveries, {});
+  if (deliveries[order.id]) return deliveries[order.id];
+  const stock = load<StockItem[]>(STORAGE_KEYS.stock, mockStock);
+  const item = stock.find((s) => s.status === "available" && (s.productId === order.productId || s.productId === order.productName));
+  if (!item) return null;
+  const delivery = stockToDelivery(item);
+  deliveries[order.id] = delivery;
+  save(STORAGE_KEYS.deliveries, deliveries);
+  save(STORAGE_KEYS.stock, stock.map((s) => (s.id === item.id ? { ...s, status: "delivered" } : s)));
+  return delivery;
+}
+export async function updateOrderStatus(id: string, status: Order["status"]): Promise<Order | null> { if (IS_MOCK_MODE) { const list = await getOrders(); const next = list.map((o) => (o.id === id ? { ...o, status } : o)); const updated = next.find((o) => o.id === id) ?? null; if (updated && (status === "approved" || status === "delivered")) allocateMockDelivery(updated); save(STORAGE_KEYS.orders, next); return delay(updated); } if (status === "approved") { const data = await http<{ order: BackendOrder }>(`/admin/orders/${id}/approve`, { method: "POST" }); return orderToFrontend(data.order); }
   if (status === "delivered") { const data = await http<{ order: BackendOrder }>(`/admin/orders/${id}/mark-delivered`, { method: "POST" }); return orderToFrontend(data.order); } if (status === "rejected") { const data = await http<{ order: BackendOrder }>(`/admin/orders/${id}/reject`, { method: "POST", body: JSON.stringify({ reason: "Rejected by admin" }) }); return orderToFrontend(data.order); } throw new Error("Restoring pending orders is not supported in live mode."); }
-export async function getOrderDelivery(orderId: string): Promise<DeliveryPayload | null> { if (IS_MOCK_MODE) return null; const token = getOrderToken(orderId); if (!token) return null; try { const data = await http<{ delivery: DeliveryPayload }>(`/orders/${orderId}/delivery?token=${encodeURIComponent(token)}`); return data.delivery; } catch { return null; } }
+export async function getOrderDelivery(orderId: string): Promise<DeliveryPayload | null> { if (IS_MOCK_MODE) return delay(load<Record<string, DeliveryPayload>>(STORAGE_KEYS.deliveries, {})[orderId] || null); const token = getOrderToken(orderId); if (!token) return null; try { const data = await http<{ delivery: DeliveryPayload }>(`/orders/${orderId}/delivery?token=${encodeURIComponent(token)}`); return data.delivery; } catch { return null; } }
 export type TrackOrderResult = { order: Order; delivery?: DeliveryPayload | null };
 function trackPayloadToOrder(x: any): Order {
   return {
@@ -307,15 +335,25 @@ export async function trackOrdersByCode(code: string): Promise<TrackOrderResult[
   if (IS_MOCK_MODE) {
     const q = code.trim().toLowerCase();
     const list = (await getOrders()).filter((o) => [o.id, o.transactionId, o.customerOrderRef || ""].some((v) => String(v).toLowerCase() === q));
-    return list.map((order) => ({ order, delivery: null }));
+    const deliveries = load<Record<string, DeliveryPayload>>(STORAGE_KEYS.deliveries, {});
+    return list.map((order) => ({ order, delivery: deliveries[order.id] || null }));
   }
   const data = await http<{ orders: any[] }>("/track-orders", { method: "POST", body: JSON.stringify({ code }) });
   return (data.orders || []).map((x) => ({ order: trackPayloadToOrder(x), delivery: x.delivery || null }));
 }
 
 export async function getStock(): Promise<StockItem[]> { if (IS_MOCK_MODE) return delay(load(STORAGE_KEYS.stock, mockStock)); const data = await http<{ stock: BackendStock[] }>("/admin/stock"); return data.stock.map(stockToFrontend); }
-export async function createStock(s: Omit<StockItem, "id" | "createdAt">): Promise<StockItem> { if (IS_MOCK_MODE) { const list = await getStock(); const item: StockItem = { ...s, id: `STK-${Math.floor(100 + Math.random() * 900)}`, createdAt: new Date().toISOString() }; save(STORAGE_KEYS.stock, [item, ...list]); return delay(item); } const productId = await resolveBackendProductId(s.productId); const data = await http<{ stock: BackendStock }>("/admin/stock", { method: "POST", body: JSON.stringify({ productId, type: s.email || s.password ? "credentials" : "instruction", payload: { email: s.email, password: s.password, instruction: s.instructions, videoUrl: s.videoUrl || "", imageUrl: s.imageUrl || "" }, adminNote: s.instructions || "" }) }); return stockToFrontend(data.stock); }
+export async function createStock(s: Omit<StockItem, "id" | "createdAt">): Promise<StockItem> { if (IS_MOCK_MODE) { const list = await getStock(); const item: StockItem = { ...s, id: `STK-${Math.floor(100 + Math.random() * 900)}`, createdAt: new Date().toISOString() }; save(STORAGE_KEYS.stock, [item, ...list]); return delay(item); } const productId = await resolveBackendProductId(s.productId); const deliveryMode = s.deliveryMode || "credentials"; const data = await http<{ stock: BackendStock }>("/admin/stock", { method: "POST", body: JSON.stringify({ productId, type: deliveryMode, payload: { deliveryMode, email: s.email, password: s.password, activationCode: s.activationCode || "", clientId: s.loginClientId || "", refreshToken: s.loginRefreshToken || "", instruction: s.instructions, videoUrl: s.videoUrl || "", imageUrl: s.imageUrl || "" }, adminNote: s.instructions || "" }) }); return stockToFrontend(data.stock); }
 export async function deleteStock(id: string): Promise<void> { if (IS_MOCK_MODE) { const list = await getStock(); save(STORAGE_KEYS.stock, list.filter((s) => s.id !== id)); return delay(undefined); } await http<void>(`/admin/stock/${id}/disable`, { method: "PATCH", body: JSON.stringify({ enable: false }) }); }
+
+export async function fetchLatestLoginCode(orderId: string): Promise<LoginCodeResult> {
+  if (IS_MOCK_MODE) {
+    return delay({ code: String(Math.floor(100000 + Math.random() * 900000)), subject: "Mock login code", receivedAt: new Date().toISOString(), preview: "Use this code to finish sign in." }, 700);
+  }
+  const token = getOrderToken(orderId);
+  if (!token) throw new Error("Secure order token missing. Open this from your original order page or track with your order code.");
+  return http<LoginCodeResult>(`/orders/${orderId}/login-code?token=${encodeURIComponent(token)}`, { method: "POST" });
+}
 
 export async function getPaymentSettings(): Promise<PaymentSettings> { if (IS_MOCK_MODE) return delay(load(STORAGE_KEYS.payment, mockPaymentSettings)); const data = await http<{ methods: BackendPaymentMethod[] }>("/payment-methods"); if (!data.methods.length) return mockPaymentSettings; return paymentToFrontend(data.methods); }
 export async function updatePaymentSettings(s: PaymentSettings): Promise<PaymentSettings> { if (IS_MOCK_MODE) { save(STORAGE_KEYS.payment, s); return delay(s); } const methods: BackendPaymentMethod[] = [ { key: "bangladesh", title: "Bangladesh", instructions: s.bangladesh.instructions, accounts: [{ label: "bKash", value: s.bangladesh.bkash, note: "Send Money" }, { label: "Nagad", value: s.bangladesh.nagad, note: "Send Money" }], isActive: true }, { key: "pakistan", title: "Pakistan", instructions: s.pakistan.instructions, accounts: [{ label: "Easypaisa", value: s.pakistan.easypaisa }, { label: "JazzCash", value: s.pakistan.jazzcash }, { label: "Bank", value: s.pakistan.bank }], isActive: true }, { key: "binance", title: "Binance / Crypto", instructions: s.binance.instructions, accounts: [{ label: "Binance Pay ID", value: s.binance.payId }, { label: "Wallet Address", value: s.binance.wallet }], isActive: true } ]; await Promise.all(methods.map((m) => http(`/admin/payment-methods/${m.key}`, { method: "PUT", body: JSON.stringify(m) }))); return s; }

@@ -1,5 +1,6 @@
 export type PriceRegion = "bd" | "pk" | "world";
 export type CurrencyCode = "BDT" | "PKR" | "USDT" | "USD";
+export type DeliveryMode = "credentials" | "activation_code" | "login_code" | "manual";
 
 export type Product = {
   id: string;
@@ -22,6 +23,7 @@ export type Product = {
   shortDescription: string;
   description: string;
   features: string[];
+  deliveryMode: DeliveryMode;
   deliveryMethod: string;
   terms: string;
   stock: number;
@@ -34,8 +36,12 @@ export type Product = {
 export type StockItem = {
   id: string;
   productId: string;
+  deliveryMode: DeliveryMode;
   email: string;
   password: string;
+  activationCode?: string;
+  loginClientId?: string;
+  loginRefreshToken?: string;
   instructions: string;
   videoUrl?: string;
   imageUrl?: string;

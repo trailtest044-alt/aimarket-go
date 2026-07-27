@@ -4,6 +4,7 @@ import { Search, ClipboardList, Loader2, Copy, CheckCircle2, Clock, Truck, XCirc
 import { toast } from "sonner";
 import { SiteHeader, SiteFooter } from "@/components/site-header";
 import { SupportPopups, SupportHelpSection } from "@/components/support-popups";
+import { CustomerDeliveryCard } from "@/components/customer-delivery-card";
 import { trackOrdersByCode, formatMoney, type TrackOrderResult, type DeliveryPayload } from "@/lib/api";
 import type { Order } from "@/lib/mock-data";
 
@@ -135,7 +136,7 @@ function TrackedOrder({ result }: { result: TrackOrderResult }) {
           Waiting for admin approval. Track again using the same Transaction ID or Order ID.
         </div>
       )}
-      {(order.status === "approved" || order.status === "delivered") && <DeliveryCard delivery={delivery} />}
+      {(order.status === "approved" || order.status === "delivered") && <CustomerDeliveryCard orderId={order.id} delivery={delivery} />}
       {order.status === "rejected" && (
         <div className="mt-5 rounded-2xl border border-destructive/25 bg-destructive/10 p-4 text-sm text-destructive">
           Order rejected. Please contact support.

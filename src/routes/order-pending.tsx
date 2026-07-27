@@ -4,6 +4,7 @@ import { useState } from "react";
 import { z } from "zod";
 import { SiteHeader, SiteFooter } from "@/components/site-header";
 import { SupportPopups, SupportHelpSection } from "@/components/support-popups";
+import { CustomerDeliveryCard } from "@/components/customer-delivery-card";
 import {
   CheckCircle2,
   Home,
@@ -130,7 +131,7 @@ function OrderPendingPage() {
 
           <OrderSummary params={params} liveOrder={liveOrder} />
 
-          {isDelivered && <DeliveryCard delivery={delivery} />}
+          {isDelivered && <CustomerDeliveryCard orderId={liveOrder?.id || params.orderId || ""} delivery={delivery} />}
 
           <div className="mt-7">
             <SupportHelpSection title={isDelivered ? "Need help with delivery?" : "Need help while waiting?"} />

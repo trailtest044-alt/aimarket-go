@@ -4,6 +4,7 @@ import { useState } from "react";
 import { getOrderById, getOrderDelivery, type DeliveryPayload, formatMoney } from "@/lib/api";
 import { SiteHeader, SiteFooter } from "@/components/site-header";
 import { SupportPopups, SupportHelpSection } from "@/components/support-popups";
+import { CustomerDeliveryCard } from "@/components/customer-delivery-card";
 import { Clock, CheckCircle2, Truck, XCircle, ShieldCheck, ArrowLeft, Loader2, Copy, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import type { Order } from "@/lib/mock-data";
@@ -87,7 +88,7 @@ function OrderDetails({ order, delivery }: { order: Order; delivery?: DeliveryPa
         </div>
       </div>
 
-      {(order.status === "approved" || order.status === "delivered") && <DeliveryCard delivery={delivery} />}
+      {(order.status === "approved" || order.status === "delivered") && <CustomerDeliveryCard orderId={order.id} delivery={delivery} />}
       {order.status === "rejected" && (
         <div className="mt-6 rounded-2xl border border-destructive/30 bg-destructive/8 p-5 text-sm text-destructive">
           Order rejected. Please contact support for assistance.
