@@ -8,6 +8,8 @@ import {
   type Product,
   type Order,
   type StockItem,
+  type MailTxtAccount,
+  type MailTxtFile,
   type PaymentSettings,
   type PriceRegion,
   type CurrencyCode,
@@ -33,6 +35,7 @@ const STORAGE_KEYS = {
   orders: "mp_orders",
   stock: "mp_stock",
   deliveries: "mp_deliveries",
+  mailTxtFiles: "mp_mail_txt_files",
   payment: "mp_payment_settings",
   admin: "mp_admin_auth",
   token: "mp_admin_token",
@@ -88,7 +91,8 @@ type BackendOrder = {
   status: Order["status"]; createdAt?: string; reviewedAt?: string; rejectReason?: string | null; deliveryAvailable?: boolean;
   approvedByNickname?: string; deliveredByNickname?: string; rejectedByNickname?: string; reviewedByNickname?: string;
 };
-type BackendStock = { _id: string; productId?: string | { _id?: string; title?: string; slug?: string }; status: "available" | "reserved" | "delivered" | "disabled"; adminNote?: string; createdAt?: string; payload?: { deliveryMode?: DeliveryMode; email?: string; password?: string; activationCode?: string; clientId?: string; refreshToken?: string; instruction?: string; videoUrl?: string; imageUrl?: string }; createdByNickname?: string; };
+type BackendStock = { _id: string; productId?: string | { _id?: string; title?: string; slug?: string }; status: "available" | "reserved" | "delivered" | "disabled"; adminNote?: string; createdAt?: string; payload?: { deliveryMode?: DeliveryMode; email?: string; password?: string; activationCode?: string; instruction?: string; videoUrl?: string; imageUrl?: string }; createdByNickname?: string; };
+type BackendMailTxtFile = Omit<MailTxtFile, "id"> & { _id?: string; id?: string };
 
 export type DeliveryPayload = { deliveryMode?: DeliveryMode; email?: string; password?: string; activationCode?: string; instruction?: string; instructions?: string; videoUrl?: string; imageUrl?: string; canFetchLoginCode?: boolean; extra?: Record<string, unknown>; };
 export type LoginCodeResult = { code: string; subject?: string; receivedAt?: string; preview?: string };
@@ -174,7 +178,17 @@ function orderToFrontend(o: BackendOrder): Order {
     status: o.status, createdAt: o.createdAt || new Date().toISOString(), approvedByNickname: o.approvedByNickname || "", deliveredByNickname: o.deliveredByNickname || "", rejectedByNickname: o.rejectedByNickname || "", reviewedByNickname: o.reviewedByNickname || "",
   };
 }
-function stockToFrontend(s: BackendStock): StockItem { const productId = typeof s.productId === "object" ? (s.productId.slug || s.productId._id || "") : (s.productId || ""); return { id: s._id, productId, deliveryMode: s.payload?.deliveryMode || "credentials", email: s.payload?.email || "Encrypted", password: s.payload?.password ? "••••••••" : "Encrypted", activationCode: s.payload?.activationCode ? "••••••••" : undefined, loginClientId: s.payload?.clientId ? "saved" : undefined, loginRefreshToken: s.payload?.refreshToken ? "saved" : undefined, instructions: s.payload?.instruction || s.adminNote || "Encrypted delivery item", videoUrl: s.payload?.videoUrl, imageUrl: s.payload?.imageUrl, status: s.status === "available" ? "available" : "delivered", createdAt: s.createdAt || new Date().toISOString(), addedBy: s.createdByNickname || "" }; }
+function stockToFrontend(s: BackendStock): StockItem { const productId = typeof s.productId === "object" ? (s.productId.slug || s.productId._id || "") : (s.productId || ""); return { id: s._id, productId, deliveryMode: s.payload?.deliveryMode || "credentials", email: s.payload?.email || "Encrypted", password: s.payload?.password ? "********" : "Encrypted", activationCode: s.payload?.activationCode ? "********" : undefined, instructions: s.payload?.instruction || s.adminNote || "Encrypted delivery item", videoUrl: s.payload?.videoUrl, imageUrl: s.payload?.imageUrl, status: s.status === "available" ? "available" : "delivered", createdAt: s.createdAt || new Date().toISOString(), addedBy: s.createdByNickname || "" }; }
+function mailTxtFileFromBackend(f: BackendMailTxtFile): MailTxtFile { return { ...f, id: f.id || f._id || `mail-${Date.now()}`, accountCount: Number(f.accountCount || f.accounts?.length || 0), dateAdded: Number(f.dateAdded || Date.now()) }; }
+function parseMailTxtAccounts(text: string): MailTxtAccount[] {
+  return text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => line.split("|").map((part) => part.trim()))
+    .filter((parts) => parts.length >= 4 && parts[0].includes("@") && parts[2] && parts[3])
+    .map((parts) => ({ email: parts[0], password: parts[1] || "", refreshToken: parts[2], clientId: parts[3] }));
+}
 async function resolveBackendProductId(productIdOrSlug: string): Promise<string> { if (objectIdRe.test(productIdOrSlug)) return productIdOrSlug; const product = await getProductById(productIdOrSlug); return product?.backendId || productIdOrSlug; }
 function stockToDelivery(s: StockItem): DeliveryPayload {
   return {
@@ -343,8 +357,32 @@ export async function trackOrdersByCode(code: string): Promise<TrackOrderResult[
 }
 
 export async function getStock(): Promise<StockItem[]> { if (IS_MOCK_MODE) return delay(load(STORAGE_KEYS.stock, mockStock)); const data = await http<{ stock: BackendStock[] }>("/admin/stock"); return data.stock.map(stockToFrontend); }
-export async function createStock(s: Omit<StockItem, "id" | "createdAt">): Promise<StockItem> { if (IS_MOCK_MODE) { const list = await getStock(); const item: StockItem = { ...s, id: `STK-${Math.floor(100 + Math.random() * 900)}`, createdAt: new Date().toISOString() }; save(STORAGE_KEYS.stock, [item, ...list]); return delay(item); } const productId = await resolveBackendProductId(s.productId); const deliveryMode = s.deliveryMode || "credentials"; const data = await http<{ stock: BackendStock }>("/admin/stock", { method: "POST", body: JSON.stringify({ productId, type: deliveryMode, payload: { deliveryMode, email: s.email, password: s.password, activationCode: s.activationCode || "", clientId: s.loginClientId || "", refreshToken: s.loginRefreshToken || "", instruction: s.instructions, videoUrl: s.videoUrl || "", imageUrl: s.imageUrl || "" }, adminNote: s.instructions || "" }) }); return stockToFrontend(data.stock); }
+export async function createStock(s: Omit<StockItem, "id" | "createdAt">): Promise<StockItem> { if (IS_MOCK_MODE) { const list = await getStock(); const item: StockItem = { ...s, id: `STK-${Math.floor(100 + Math.random() * 900)}`, createdAt: new Date().toISOString() }; save(STORAGE_KEYS.stock, [item, ...list]); return delay(item); } const productId = await resolveBackendProductId(s.productId); const deliveryMode = s.deliveryMode || "credentials"; const data = await http<{ stock: BackendStock }>("/admin/stock", { method: "POST", body: JSON.stringify({ productId, type: deliveryMode, payload: { deliveryMode, email: s.email, password: s.password, activationCode: s.activationCode || "", instruction: s.instructions, videoUrl: s.videoUrl || "", imageUrl: s.imageUrl || "" }, adminNote: s.instructions || "" }) }); return stockToFrontend(data.stock); }
 export async function deleteStock(id: string): Promise<void> { if (IS_MOCK_MODE) { const list = await getStock(); save(STORAGE_KEYS.stock, list.filter((s) => s.id !== id)); return delay(undefined); } await http<void>(`/admin/stock/${id}/disable`, { method: "PATCH", body: JSON.stringify({ enable: false }) }); }
+
+export async function getMailTxtFiles(): Promise<MailTxtFile[]> {
+  if (IS_MOCK_MODE) return delay(load<MailTxtFile[]>(STORAGE_KEYS.mailTxtFiles, []));
+  const data = await http<{ files: BackendMailTxtFile[] }>("/admin/mail-txt-files");
+  return (data.files || []).map(mailTxtFileFromBackend);
+}
+
+export async function uploadMailTxtFile(input: { name: string; text: string }): Promise<MailTxtFile> {
+  const accounts = parseMailTxtAccounts(input.text);
+  if (!accounts.length) throw new Error("No valid mail accounts found. Use: email | password | refresh_token | client_id");
+  if (IS_MOCK_MODE) {
+    const files = load<MailTxtFile[]>(STORAGE_KEYS.mailTxtFiles, []);
+    const file: MailTxtFile = { id: `MAIL-${Date.now()}`, name: input.name, accountCount: accounts.length, dateAdded: Date.now(), accounts };
+    save(STORAGE_KEYS.mailTxtFiles, [file, ...files]);
+    return delay(file);
+  }
+  const data = await http<{ file: BackendMailTxtFile }>("/admin/mail-txt-files", { method: "POST", body: JSON.stringify({ name: input.name, accounts }) });
+  return mailTxtFileFromBackend(data.file);
+}
+
+export async function deleteMailTxtFile(id: string): Promise<void> {
+  if (IS_MOCK_MODE) { save(STORAGE_KEYS.mailTxtFiles, load<MailTxtFile[]>(STORAGE_KEYS.mailTxtFiles, []).filter((f) => f.id !== id)); return delay(undefined); }
+  await http<void>(`/admin/mail-txt-files/${id}`, { method: "DELETE" });
+}
 
 export async function fetchLatestLoginCode(orderId: string): Promise<LoginCodeResult> {
   if (IS_MOCK_MODE) {

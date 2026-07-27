@@ -12,7 +12,7 @@ export const Route = createFileRoute("/admin/stock")({ component: StockPage });
 const deliveryOptions: Array<{ value: DeliveryMode; label: string; hint: string }> = [
   { value: "credentials", label: "Email + password", hint: "email | password | instruction" },
   { value: "activation_code", label: "Activation code", hint: "activation_code | instruction" },
-  { value: "login_code", label: "Login with email code", hint: "email | password | refresh_token | client_id" },
+  { value: "login_code", label: "Login with email code", hint: "email | optional password | instruction" },
   { value: "manual", label: "Manual delivery", hint: "instruction only" },
 ];
 
@@ -55,7 +55,7 @@ function StockPage() {
                   <td className="font-mono text-xs">
                     <div>{s.deliveryMode === "activation_code" ? s.activationCode || "Saved code" : s.email}</div>
                     {s.deliveryMode === "credentials" && <div className="text-muted-foreground">{s.password}</div>}
-                    {s.deliveryMode === "login_code" && <div className="text-muted-foreground">Inbox token saved</div>}
+                    {s.deliveryMode === "login_code" && <div className="text-muted-foreground">Reads code from Mail TXT</div>}
                   </td>
                   <td className="max-w-xs text-xs text-muted-foreground">
                     <div className="truncate">{s.instructions}</div>
@@ -99,8 +99,6 @@ function AddModal({ products, onClose, onSave }: { products: Product[]; onClose:
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [activationCode, setActivationCode] = useState("");
-  const [loginClientId, setLoginClientId] = useState("");
-  const [loginRefreshToken, setLoginRefreshToken] = useState("");
   const [instructions, setInstructions] = useState("");
   const [videoUrl, setVideoUrl] = useState("");
   const [imageUrl, setImageUrl] = useState("");
@@ -109,7 +107,7 @@ function AddModal({ products, onClose, onSave }: { products: Product[]; onClose:
   const hint = useMemo(() => deliveryOptions.find((option) => option.value === deliveryMode)?.hint || "", [deliveryMode]);
 
   function baseItem(): Omit<StockItem, "id" | "createdAt" | "status"> {
-    return { productId, deliveryMode, email, password, activationCode, loginClientId, loginRefreshToken, instructions, videoUrl, imageUrl, addedBy: "" };
+    return { productId, deliveryMode, email, password, activationCode, instructions, videoUrl, imageUrl, addedBy: "" };
   }
 
   function parseBulk() {
@@ -117,7 +115,7 @@ function AddModal({ products, onClose, onSave }: { products: Product[]; onClose:
     return rows.map((line) => {
       const parts = line.split("|").map((part) => part.trim());
       if (deliveryMode === "login_code") {
-        return { ...baseItem(), email: parts[0] || "", password: parts[1] || "", loginRefreshToken: parts[2] || "", loginClientId: parts[3] || "", instructions: parts[4] || instructions };
+        return { ...baseItem(), email: parts[0] || "", password: parts[1] || "", instructions: parts[2] || instructions };
       }
       if (deliveryMode === "activation_code") {
         return { ...baseItem(), activationCode: parts[0] || "", instructions: parts[1] || instructions };
@@ -135,7 +133,7 @@ function AddModal({ products, onClose, onSave }: { products: Product[]; onClose:
     const invalid = items.find((item) => {
       if (item.deliveryMode === "credentials") return !item.email || !item.password;
       if (item.deliveryMode === "activation_code") return !item.activationCode;
-      if (item.deliveryMode === "login_code") return !item.email || !item.loginRefreshToken || !item.loginClientId;
+      if (item.deliveryMode === "login_code") return !item.email;
       return !item.instructions;
     });
     if (invalid) return toast.error(`Missing required fields for ${deliveryLabel(deliveryMode)}`);
@@ -169,8 +167,9 @@ function AddModal({ products, onClose, onSave }: { products: Product[]; onClose:
             <>
               <Field label="Delivery email" value={email} onChange={setEmail} />
               <Field label="Password (optional)" value={password} onChange={setPassword} />
-              <Field label="Microsoft client id" value={loginClientId} onChange={setLoginClientId} />
-              <Field label="Refresh token" value={loginRefreshToken} onChange={setLoginRefreshToken} />
+              <div className="rounded-2xl border border-success/25 bg-success/8 p-4 text-xs leading-5 text-success">
+                Upload the TXT file once from Mail TXT. This stock item only needs the delivered email address.
+              </div>
             </>
           )}
 

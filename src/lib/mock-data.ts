@@ -40,14 +40,28 @@ export type StockItem = {
   email: string;
   password: string;
   activationCode?: string;
-  loginClientId?: string;
-  loginRefreshToken?: string;
   instructions: string;
   videoUrl?: string;
   imageUrl?: string;
   status: "available" | "delivered";
   createdAt: string;
   addedBy?: string;
+};
+
+export type MailTxtAccount = {
+  email: string;
+  password?: string;
+  refreshToken: string;
+  clientId: string;
+};
+
+export type MailTxtFile = {
+  id: string;
+  name: string;
+  accountCount: number;
+  dateAdded: number;
+  uploadedBy?: string;
+  accounts?: MailTxtAccount[];
 };
 
 export type Order = {
