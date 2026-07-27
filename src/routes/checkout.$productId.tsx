@@ -536,7 +536,7 @@ function CopyNumber({ value, accent }: { value: string; accent: string }) {
     toast.success("Number copied — অ্যাপে পেস্ট করুন");
   }
   return (
-    <button type="button" onClick={copy} className={`mt-4 flex w-full items-center justify-between gap-3 rounded-2xl border border-white/10 bg-black/25 px-4 py-3.5 text-left transition-transform active:scale-[0.99] ${flashed ? "copy-flash" : ""}`}>
+    <button type="button" onClick={copy} className={`wallet-copy-box mt-4 flex w-full items-center justify-between gap-3 rounded-2xl px-4 py-3.5 text-left transition-transform active:scale-[0.99] ${flashed ? "copy-flash" : ""}`}>
       <span className="wallet-number">{value || "Not set — admin will add"}</span>
       <span className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-bold" style={{ background: `${accent}22`, color: accent }}>
         {flashed ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />} {flashed ? "Copied" : "Tap to copy"}
