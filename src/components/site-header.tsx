@@ -1,10 +1,10 @@
 import { Link } from "@tanstack/react-router";
-import { Menu, X, ShoppingBag, MessageCircle } from "lucide-react";
+import { LogIn, Menu, UserCircle, X, ShoppingBag, MessageCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { BrandLogo, BrandMark } from "@/components/brand-logo";
 import { BRAND, SUPPORT } from "@/lib/brand";
-import { getVisitorRegion, getRegionOverride, setVisitorRegion } from "@/lib/api";
+import { getCurrentCustomer, getVisitorRegion, getRegionOverride, setVisitorRegion, startGoogleLogin, type CustomerSession } from "@/lib/api";
 import type { PriceRegion } from "@/lib/mock-data";
 
 const REGION_OPTIONS: { key: PriceRegion; label: string }[] = [
@@ -57,6 +57,7 @@ function RegionSwitcher({ className = "" }: { className?: string }) {
 export function SiteHeader() {
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [customer, setCustomer] = useState<CustomerSession | null>(() => getCurrentCustomer());
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 10);
@@ -65,10 +66,17 @@ export function SiteHeader() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  useEffect(() => {
+    const sync = () => setCustomer(getCurrentCustomer());
+    window.addEventListener("customer-auth-changed", sync);
+    return () => window.removeEventListener("customer-auth-changed", sync);
+  }, []);
+
   const nav = [
     { to: "/", label: "Home" },
     { to: "/products", label: "Products" },
     { to: "/track-orders", label: "Track Orders" },
+    { to: "/account", label: "Account" },
     { to: "/admin/login", label: "Admin" },
   ] as const;
 
@@ -106,6 +114,16 @@ export function SiteHeader() {
             >
               <ShoppingBag className="h-4 w-4" /> Shop now
             </Link>
+            {customer ? (
+              <Link to="/account" className="btn-ghost ml-1 inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold">
+                {customer.picture ? <img src={customer.picture} alt="" className="h-5 w-5 rounded-full" /> : <UserCircle className="h-4 w-4" />}
+                Account
+              </Link>
+            ) : (
+              <button onClick={() => startGoogleLogin("/account")} className="btn-ghost ml-1 inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold">
+                <LogIn className="h-4 w-4" /> Login
+              </button>
+            )}
           </nav>
 
           <button
@@ -140,6 +158,25 @@ export function SiteHeader() {
               >
                 <ShoppingBag className="h-4 w-4" /> Shop now
               </Link>
+              {customer ? (
+                <Link
+                  to="/account"
+                  onClick={() => setOpen(false)}
+                  className="btn-ghost mt-2 inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold"
+                >
+                  <UserCircle className="h-4 w-4" /> My account
+                </Link>
+              ) : (
+                <button
+                  onClick={() => {
+                    setOpen(false);
+                    startGoogleLogin("/account");
+                  }}
+                  className="btn-ghost mt-2 inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold"
+                >
+                  <LogIn className="h-4 w-4" /> Login with Google
+                </button>
+              )}
             </div>
           </div>
         )}

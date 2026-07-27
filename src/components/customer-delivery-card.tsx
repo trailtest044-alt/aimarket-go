@@ -3,7 +3,7 @@ import { CheckCircle2, Copy, Eye, EyeOff, FileText, Image as ImageIcon, KeyRound
 import { toast } from "sonner";
 import { fetchLatestLoginCode, type DeliveryPayload, type LoginCodeResult } from "@/lib/api";
 
-export function CustomerDeliveryCard({ orderId, delivery }: { orderId: string; delivery?: DeliveryPayload | null }) {
+export function CustomerDeliveryCard({ orderId, delivery, fetchLoginCode = fetchLatestLoginCode }: { orderId: string; delivery?: DeliveryPayload | null; fetchLoginCode?: (orderId: string) => Promise<LoginCodeResult> }) {
   const [showPassword, setShowPassword] = useState(false);
   const [loginCode, setLoginCode] = useState<LoginCodeResult | null>(null);
   const [codeBusy, setCodeBusy] = useState(false);
@@ -15,7 +15,7 @@ export function CustomerDeliveryCard({ orderId, delivery }: { orderId: string; d
     if (!orderId || codeBusy) return;
     setCodeBusy(true);
     try {
-      const result = await fetchLatestLoginCode(orderId);
+      const result = await fetchLoginCode(orderId);
       setLoginCode(result);
       toast.success("Latest login code loaded");
     } catch (error) {

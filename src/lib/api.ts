@@ -40,6 +40,8 @@ const STORAGE_KEYS = {
   admin: "mp_admin_auth",
   token: "mp_admin_token",
   adminInfo: "mp_admin_info",
+  customerToken: "mp_customer_token",
+  customerInfo: "mp_customer_info",
   orderTokens: "mp_order_tokens",
   region: "mp_price_region",
   regionOverride: "mp_region_override",
@@ -55,6 +57,7 @@ function load<T>(key: string, fallback: T): T {
 function save<T>(key: string, value: T) { if (isBrowser) window.localStorage.setItem(key, JSON.stringify(value)); }
 function delay<T>(value: T, ms = 200): Promise<T> { return new Promise((res) => setTimeout(() => res(value), ms)); }
 function getToken(): string | null { return isBrowser ? window.localStorage.getItem(STORAGE_KEYS.token) : null; }
+function getCustomerToken(): string | null { return isBrowser ? window.localStorage.getItem(STORAGE_KEYS.customerToken) : null; }
 function getOrderTokens(): Record<string, string> { return load<Record<string, string>>(STORAGE_KEYS.orderTokens, {}); }
 function saveOrderToken(orderId: string, token: string) { if (!token) return; const tokens = getOrderTokens(); tokens[orderId] = token; save(STORAGE_KEYS.orderTokens, tokens); }
 function getOrderToken(orderId: string): string | null { return getOrderTokens()[orderId] || null; }
@@ -63,6 +66,10 @@ async function http<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers: Record<string, string> = { "Content-Type": "application/json", ...(init.headers as Record<string, string> | undefined) };
   const token = getToken();
   if (token) headers.Authorization = `Bearer ${token}`;
+  else {
+    const customerToken = getCustomerToken();
+    if (customerToken) headers.Authorization = `Bearer ${customerToken}`;
+  }
   const res = await fetch(`${API_BASE_URL}${path}`, { ...init, headers });
   if (!res.ok) {
     let message = `Request failed: ${res.status}`;
@@ -96,6 +103,7 @@ type BackendMailTxtFile = Omit<MailTxtFile, "id"> & { _id?: string; id?: string 
 
 export type DeliveryPayload = { deliveryMode?: DeliveryMode; email?: string; password?: string; activationCode?: string; instruction?: string; instructions?: string; videoUrl?: string; imageUrl?: string; canFetchLoginCode?: boolean; extra?: Record<string, unknown>; };
 export type LoginCodeResult = { code: string; subject?: string; receivedAt?: string; preview?: string };
+export type CustomerSession = { id?: string; name: string; email: string; picture?: string };
 
 function slugify(value: string) { return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)+/g, "") || `product-${Date.now()}`; }
 function money(value: unknown): number { const n = Number(value); return Number.isFinite(n) ? n : 0; }
@@ -251,6 +259,46 @@ export function clearVisitorRegionOverride() {
   window.localStorage.removeItem(STORAGE_KEYS.region);
 }
 
+export function getCurrentCustomer(): CustomerSession | null {
+  return isBrowser ? load<CustomerSession | null>(STORAGE_KEYS.customerInfo, null) : null;
+}
+
+export function getCustomerAuthToken(): string | null {
+  return getCustomerToken();
+}
+
+export function saveCustomerSession(token: string, customer: CustomerSession) {
+  if (!isBrowser) return;
+  window.localStorage.setItem(STORAGE_KEYS.customerToken, token);
+  save(STORAGE_KEYS.customerInfo, customer);
+  window.dispatchEvent(new Event("customer-auth-changed"));
+}
+
+export function logoutCustomer() {
+  if (!isBrowser) return;
+  window.localStorage.removeItem(STORAGE_KEYS.customerToken);
+  window.localStorage.removeItem(STORAGE_KEYS.customerInfo);
+  window.dispatchEvent(new Event("customer-auth-changed"));
+}
+
+export function startGoogleLogin(returnTo = "/account") {
+  if (!isBrowser) return;
+  window.location.href = `${API_BASE_URL}/auth/google/start?returnTo=${encodeURIComponent(returnTo)}`;
+}
+
+export async function refreshCurrentCustomer(): Promise<CustomerSession | null> {
+  if (IS_MOCK_MODE) return getCurrentCustomer();
+  if (!getCustomerToken()) return null;
+  try {
+    const data = await http<{ customer: CustomerSession }>("/auth/customer/me");
+    saveCustomerSession(getCustomerToken() || "", data.customer);
+    return data.customer;
+  } catch {
+    logoutCustomer();
+    return null;
+  }
+}
+
 export async function getProducts(): Promise<Product[]> { if (IS_MOCK_MODE) return delay(load(STORAGE_KEYS.products, mockProducts)); const region = (await getVisitorRegion()).region; const data = await http<{ products: BackendProduct[] }>(`/products?region=${region}`); return data.products.map(productToFrontend).sort((a, b) => (a.sortOrder || 999999) - (b.sortOrder || 999999) || a.name.localeCompare(b.name)); }
 
 export async function reorderProducts(items: Array<{ id: string; backendId?: string; sortOrder: number }>): Promise<Product[]> {
@@ -321,6 +369,24 @@ function allocateMockDelivery(order: Order) {
 export async function updateOrderStatus(id: string, status: Order["status"]): Promise<Order | null> { if (IS_MOCK_MODE) { const list = await getOrders(); const next = list.map((o) => (o.id === id ? { ...o, status } : o)); const updated = next.find((o) => o.id === id) ?? null; if (updated && (status === "approved" || status === "delivered")) allocateMockDelivery(updated); save(STORAGE_KEYS.orders, next); return delay(updated); } if (status === "approved") { const data = await http<{ order: BackendOrder }>(`/admin/orders/${id}/approve`, { method: "POST" }); return orderToFrontend(data.order); }
   if (status === "delivered") { const data = await http<{ order: BackendOrder }>(`/admin/orders/${id}/mark-delivered`, { method: "POST" }); return orderToFrontend(data.order); } if (status === "rejected") { const data = await http<{ order: BackendOrder }>(`/admin/orders/${id}/reject`, { method: "POST", body: JSON.stringify({ reason: "Rejected by admin" }) }); return orderToFrontend(data.order); } throw new Error("Restoring pending orders is not supported in live mode."); }
 export async function getOrderDelivery(orderId: string): Promise<DeliveryPayload | null> { if (IS_MOCK_MODE) return delay(load<Record<string, DeliveryPayload>>(STORAGE_KEYS.deliveries, {})[orderId] || null); const token = getOrderToken(orderId); if (!token) return null; try { const data = await http<{ delivery: DeliveryPayload }>(`/orders/${orderId}/delivery?token=${encodeURIComponent(token)}`); return data.delivery; } catch { return null; } }
+export async function getCustomerOrders(): Promise<Order[]> {
+  if (IS_MOCK_MODE) {
+    const customer = getCurrentCustomer();
+    const orders = await getOrders();
+    return customer ? orders.filter((o) => o.customerEmail.toLowerCase() === customer.email.toLowerCase()) : [];
+  }
+  const data = await http<{ orders: any[] }>("/customer/orders");
+  return (data.orders || []).map(trackPayloadToOrder);
+}
+export async function getCustomerOrderDelivery(orderId: string): Promise<DeliveryPayload | null> {
+  if (IS_MOCK_MODE) return getOrderDelivery(orderId);
+  try {
+    const data = await http<{ delivery: DeliveryPayload }>(`/customer/orders/${orderId}/delivery`);
+    return data.delivery;
+  } catch {
+    return null;
+  }
+}
 export type TrackOrderResult = { order: Order; delivery?: DeliveryPayload | null };
 function trackPayloadToOrder(x: any): Order {
   return {
@@ -391,6 +457,12 @@ export async function fetchLatestLoginCode(orderId: string): Promise<LoginCodeRe
   const token = getOrderToken(orderId);
   if (!token) throw new Error("Secure order token missing. Open this from your original order page or track with your order code.");
   return http<LoginCodeResult>(`/orders/${orderId}/login-code?token=${encodeURIComponent(token)}`, { method: "POST" });
+}
+export async function fetchCustomerLatestLoginCode(orderId: string): Promise<LoginCodeResult> {
+  if (IS_MOCK_MODE) {
+    return delay({ code: String(Math.floor(100000 + Math.random() * 900000)), subject: "Mock login code", receivedAt: new Date().toISOString(), preview: "Use this code to finish sign in." }, 700);
+  }
+  return http<LoginCodeResult>(`/customer/orders/${orderId}/login-code`, { method: "POST" });
 }
 
 export async function getPaymentSettings(): Promise<PaymentSettings> { if (IS_MOCK_MODE) return delay(load(STORAGE_KEYS.payment, mockPaymentSettings)); const data = await http<{ methods: BackendPaymentMethod[] }>("/payment-methods"); if (!data.methods.length) return mockPaymentSettings; return paymentToFrontend(data.methods); }

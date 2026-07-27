@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AccountRouteImport } from './routes/account'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as OrderPendingRouteImport } from './routes/order-pending'
 import { Route as ProductsRouteImport } from './routes/products'
@@ -31,10 +32,16 @@ import { Route as AdminOrdersApprovedRouteImport } from './routes/admin.orders.a
 import { Route as AdminOrdersDeliveredRouteImport } from './routes/admin.orders.delivered'
 import { Route as AdminOrdersPendingRouteImport } from './routes/admin.orders.pending'
 import { Route as AdminOrdersRejectedRouteImport } from './routes/admin.orders.rejected'
+import { Route as AuthGoogleCallbackRouteImport } from './routes/auth.google.callback'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AccountRoute = AccountRouteImport.update({
+  id: '/account',
+  path: '/account',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminRoute = AdminRouteImport.update({
@@ -142,9 +149,15 @@ const AdminOrdersRejectedRoute = AdminOrdersRejectedRouteImport.update({
   path: '/rejected',
   getParentRoute: () => AdminOrdersRoute,
 } as any)
+const AuthGoogleCallbackRoute = AuthGoogleCallbackRouteImport.update({
+  id: '/auth/google/callback',
+  path: '/auth/google/callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/account': typeof AccountRoute
   '/admin': typeof AdminRouteWithChildren
   '/order-pending': typeof OrderPendingRoute
   '/products': typeof ProductsRouteWithChildren
@@ -166,9 +179,11 @@ export interface FileRoutesByFullPath {
   '/admin/orders/delivered': typeof AdminOrdersDeliveredRoute
   '/admin/orders/pending': typeof AdminOrdersPendingRoute
   '/admin/orders/rejected': typeof AdminOrdersRejectedRoute
+  '/auth/google/callback': typeof AuthGoogleCallbackRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/account': typeof AccountRoute
   '/order-pending': typeof OrderPendingRoute
   '/products': typeof ProductsRouteWithChildren
   '/track-orders': typeof TrackOrdersRoute
@@ -189,10 +204,12 @@ export interface FileRoutesByTo {
   '/admin/orders/delivered': typeof AdminOrdersDeliveredRoute
   '/admin/orders/pending': typeof AdminOrdersPendingRoute
   '/admin/orders/rejected': typeof AdminOrdersRejectedRoute
+  '/auth/google/callback': typeof AuthGoogleCallbackRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/account': typeof AccountRoute
   '/admin': typeof AdminRouteWithChildren
   '/order-pending': typeof OrderPendingRoute
   '/products': typeof ProductsRouteWithChildren
@@ -214,11 +231,13 @@ export interface FileRoutesById {
   '/admin/orders/delivered': typeof AdminOrdersDeliveredRoute
   '/admin/orders/pending': typeof AdminOrdersPendingRoute
   '/admin/orders/rejected': typeof AdminOrdersRejectedRoute
+  '/auth/google/callback': typeof AuthGoogleCallbackRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/account'
     | '/admin'
     | '/order-pending'
     | '/products'
@@ -240,9 +259,11 @@ export interface FileRouteTypes {
     | '/admin/orders/delivered'
     | '/admin/orders/pending'
     | '/admin/orders/rejected'
+    | '/auth/google/callback'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/account'
     | '/order-pending'
     | '/products'
     | '/track-orders'
@@ -263,9 +284,11 @@ export interface FileRouteTypes {
     | '/admin/orders/delivered'
     | '/admin/orders/pending'
     | '/admin/orders/rejected'
+    | '/auth/google/callback'
   id:
     | '__root__'
     | '/'
+    | '/account'
     | '/admin'
     | '/order-pending'
     | '/products'
@@ -287,16 +310,19 @@ export interface FileRouteTypes {
     | '/admin/orders/delivered'
     | '/admin/orders/pending'
     | '/admin/orders/rejected'
+    | '/auth/google/callback'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AccountRoute: typeof AccountRoute
   AdminRoute: typeof AdminRouteWithChildren
   OrderPendingRoute: typeof OrderPendingRoute
   ProductsRoute: typeof ProductsRouteWithChildren
   TrackOrdersRoute: typeof TrackOrdersRoute
   CheckoutProductIdRoute: typeof CheckoutProductIdRoute
   OrderStatusOrderIdRoute: typeof OrderStatusOrderIdRoute
+  AuthGoogleCallbackRoute: typeof AuthGoogleCallbackRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -306,6 +332,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/account': {
+      id: '/account'
+      path: '/account'
+      fullPath: '/account'
+      preLoaderRoute: typeof AccountRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin': {
@@ -455,6 +488,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminOrdersRejectedRouteImport
       parentRoute: typeof AdminOrdersRoute
     }
+    '/auth/google/callback': {
+      id: '/auth/google/callback'
+      path: '/auth/google/callback'
+      fullPath: '/auth/google/callback'
+      preLoaderRoute: typeof AuthGoogleCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -518,12 +558,14 @@ const ProductsRouteWithChildren = ProductsRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AccountRoute: AccountRoute,
   AdminRoute: AdminRouteWithChildren,
   OrderPendingRoute: OrderPendingRoute,
   ProductsRoute: ProductsRouteWithChildren,
   TrackOrdersRoute: TrackOrdersRoute,
   CheckoutProductIdRoute: CheckoutProductIdRoute,
   OrderStatusOrderIdRoute: OrderStatusOrderIdRoute,
+  AuthGoogleCallbackRoute: AuthGoogleCallbackRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

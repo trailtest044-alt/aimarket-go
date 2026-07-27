@@ -12,6 +12,9 @@ import {
   allowedPaymentMethods,
   priceRegionForPaymentMethod,
   validatePromoCode,
+  getCurrentCustomer,
+  startGoogleLogin,
+  type CustomerSession,
 } from "@/lib/api";
 import { WALLETS, METHOD_CHANNELS, METHOD_META, PROMO_TEXT, CHECKOUT_TEXT, type WalletKey } from "@/lib/site-config";
 import { SiteHeader, SiteFooter } from "@/components/site-header";
@@ -21,6 +24,7 @@ import { ServerLoader } from "@/components/server-loader";
 import type { AppliedPromo, PaymentSettings, PriceRegion } from "@/lib/mock-data";
 import {
   BadgePercent, Check, Copy, Loader2, ArrowLeft, PackageX, ShieldCheck, Sparkles, Ticket, X,
+  LogIn,
 } from "lucide-react";
 
 export const Route = createFileRoute("/checkout/$productId")({ component: CheckoutPage, notFoundComponent: NotFoundProduct });
@@ -72,6 +76,7 @@ function CheckoutPage() {
   const [txid, setTxid] = useState("");
   const [orderRef, setOrderRef] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [customer, setCustomer] = useState<CustomerSession | null>(() => getCurrentCustomer());
 
   // Promo state
   const [promoInput, setPromoInput] = useState("");
@@ -87,6 +92,18 @@ function CheckoutPage() {
       setChannel("");
     });
   }, []);
+
+  useEffect(() => {
+    const syncCustomer = () => setCustomer(getCurrentCustomer());
+    window.addEventListener("customer-auth-changed", syncCustomer);
+    return () => window.removeEventListener("customer-auth-changed", syncCustomer);
+  }, []);
+
+  useEffect(() => {
+    if (!customer) return;
+    setName((current) => current || customer.name || "");
+    setEmail(customer.email || "");
+  }, [customer]);
 
   const availableMethods = useMemo(() => allowedPaymentMethods(visitorRegion), [visitorRegion]);
   const selectedPriceRegion = priceRegionForPaymentMethod(method);
@@ -130,6 +147,11 @@ function CheckoutPage() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!product) return;
+    if (!customer) {
+      toast.info("Login with Google to safe purchase.");
+      startGoogleLogin(`/checkout/${product.id}`);
+      return;
+    }
     if (!inStock) return toast.error("This product is out of stock.");
     if (!canSubmit) return toast.error("Please complete all required fields.");
     setSubmitting(true);
@@ -203,6 +225,39 @@ function CheckoutPage() {
     );
   }
 
+  if (!customer) {
+    return (
+      <div className="min-h-screen">
+        <SiteHeader />
+        <SupportPopups />
+        <main className="mx-auto max-w-3xl px-4 py-16 sm:px-6">
+          <Link to="/products/$id" params={{ id: product.id }} className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground">
+            <ArrowLeft className="h-4 w-4" /> Back to product
+          </Link>
+          <div className="glass animate-rise mt-6 rounded-3xl p-8 text-center">
+            <div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-primary text-primary-foreground shadow-glow">
+              <ShieldCheck className="h-8 w-8" />
+            </div>
+            <span className="eyebrow mt-6 inline-block">Safe checkout</span>
+            <h1 className="display-luxe mt-2 text-3xl font-bold">Login with Google to safe purchase</h1>
+            <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-muted-foreground">
+              Product details are public, but buying requires Google login so your purchase history,
+              delivery, and future support stay protected in your own account.
+            </p>
+            <button
+              type="button"
+              onClick={() => startGoogleLogin(`/checkout/${product.id}`)}
+              className="btn-primary mt-7 inline-flex items-center justify-center gap-2 rounded-xl px-6 py-3 text-sm font-semibold"
+            >
+              <LogIn className="h-4 w-4" /> Continue with Google
+            </button>
+          </div>
+        </main>
+        <SiteFooter />
+      </div>
+    );
+  }
+
   const wallet = channel ? WALLETS[channel] : null;
 
   return (
@@ -232,7 +287,7 @@ function CheckoutPage() {
             <Section step="1" title={CHECKOUT_TEXT.infoTitle} done={infoDone}>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Full name" value={name} onChange={setName} placeholder="Your name" />
-                <Field label="Email" type="email" value={email} onChange={setEmail} placeholder="you@example.com" />
+                <Field label="Google email" type="email" value={email} onChange={setEmail} placeholder="you@example.com" readOnly />
                 <Field className="sm:col-span-2" label="WhatsApp / Telegram (optional)" value={contact} onChange={setContact} placeholder="+8801XXXXXXXXX or @username" />
               </div>
               <p className="mt-3 text-xs text-muted-foreground">{CHECKOUT_TEXT.infoHint}</p>
@@ -453,11 +508,11 @@ function Section({ step, title, done, children }: { step: string; title: string;
   );
 }
 
-function Field({ label, value, onChange, placeholder, type = "text", className = "" }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; type?: string; className?: string }) {
+function Field({ label, value, onChange, placeholder, type = "text", className = "", readOnly = false }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; type?: string; className?: string; readOnly?: boolean }) {
   return (
     <label className={`block ${className}`}>
       <span className="text-xs font-semibold text-muted-foreground">{label}</span>
-      <input type={type} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className="input-x mt-1.5 w-full px-3.5 py-2.5 text-sm" />
+      <input type={type} value={value} onChange={(e) => onChange(e.target.value)} readOnly={readOnly} placeholder={placeholder} className="input-x mt-1.5 w-full px-3.5 py-2.5 text-sm read-only:bg-secondary read-only:text-muted-foreground" />
     </label>
   );
 }
