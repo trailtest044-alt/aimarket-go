@@ -210,8 +210,7 @@ function stockToDelivery(s: StockItem): DeliveryPayload {
 export async function getVisitorRegion(): Promise<{ region: PriceRegion; country?: string }> {
   // A manual choice always wins, so a BD buyer can force ৳/bKash regardless of IP.
   if (isBrowser) {
-    const override = load<PriceRegion | null>(STORAGE_KEYS.regionOverride, null);
-    if (override === "bd" || override === "pk" || override === "world") return { region: override };
+    window.localStorage.removeItem(STORAGE_KEYS.regionOverride);
   }
   if (IS_MOCK_MODE) return { region: load<PriceRegion>(STORAGE_KEYS.region, "world") };
   if (isBrowser) {
@@ -239,13 +238,12 @@ export async function getVisitorRegion(): Promise<{ region: PriceRegion; country
 /** Manually pin the pricing region (from the header switcher). Overrides IP detection. */
 export function setVisitorRegion(region: PriceRegion) {
   if (!isBrowser) return;
-  window.localStorage.setItem(STORAGE_KEYS.regionOverride, JSON.stringify(region));
   save(STORAGE_KEYS.region, { region, country: region === "bd" ? "BD" : region === "pk" ? "PK" : "XX", ts: Date.now() });
 }
 
 /** The pinned region, or null when detection is in charge. */
 export function getRegionOverride(): PriceRegion | null {
-  return isBrowser ? load<PriceRegion | null>(STORAGE_KEYS.regionOverride, null) : null;
+  return null;
 }
 
 /** Drop the manual pin and clear the cached detection so IP takes over again. */

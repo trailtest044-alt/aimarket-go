@@ -11,7 +11,7 @@ export function ProductCard({ p }: { p: Product }) {
 
   return (
     <div
-      className="card-x group flex flex-col p-5"
+      className="card-x group flex h-full flex-col p-5"
       onPointerMove={(e) => {
         const r = e.currentTarget.getBoundingClientRect();
         const px = (e.clientX - r.left) / r.width;
@@ -73,7 +73,7 @@ export function ProductCard({ p }: { p: Product }) {
       </div>
 
       {/* Actions */}
-      <div className="mt-5 grid grid-cols-2 gap-2">
+      <div className="mt-auto grid grid-cols-2 gap-2 pt-5">
         <Link
           to="/products/$id"
           params={{ id: p.id }}

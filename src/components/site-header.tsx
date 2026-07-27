@@ -1,10 +1,9 @@
 import { Link } from "@tanstack/react-router";
 import { LogIn, Menu, UserCircle, X, ShoppingBag, MessageCircle } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
 import { BrandLogo, BrandMark } from "@/components/brand-logo";
 import { BRAND, SUPPORT } from "@/lib/brand";
-import { getCurrentCustomer, getVisitorRegion, getRegionOverride, setVisitorRegion, startGoogleLogin, type CustomerSession } from "@/lib/api";
+import { getCurrentCustomer, getVisitorRegion, startGoogleLogin, type CustomerSession } from "@/lib/api";
 import type { PriceRegion } from "@/lib/mock-data";
 
 const REGION_OPTIONS: { key: PriceRegion; label: string }[] = [
@@ -16,40 +15,17 @@ const REGION_OPTIONS: { key: PriceRegion; label: string }[] = [
 /** Manual currency/region switch. A BD buyer can force ৳ + bKash/Nagad even if
  *  IP detection guesses wrong; changing it refetches region-priced data. */
 function RegionSwitcher({ className = "" }: { className?: string }) {
-  const qc = useQueryClient();
   const [region, setRegion] = useState<PriceRegion>("world");
 
   useEffect(() => {
-    const pinned = getRegionOverride();
-    if (pinned) setRegion(pinned);
-    else getVisitorRegion().then((r) => setRegion(r.region)).catch(() => {});
+    getVisitorRegion().then((r) => setRegion(r.region)).catch(() => {});
   }, []);
 
-  const pick = (r: PriceRegion) => {
-    setVisitorRegion(r);
-    setRegion(r);
-    qc.invalidateQueries();
-  };
-
   return (
-    <div
-      className={`inline-flex items-center rounded-xl border border-border bg-card p-0.5 ${className}`}
-      role="group"
-      aria-label="Choose currency"
-    >
-      {REGION_OPTIONS.map((o) => (
-        <button
-          key={o.key}
-          type="button"
-          onClick={() => pick(o.key)}
-          aria-pressed={region === o.key}
-          className={`rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-colors ${
-            region === o.key ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          {o.label}
-        </button>
-      ))}
+    <div className={`inline-flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-xs font-semibold text-muted-foreground ${className}`} aria-label="Auto detected currency">
+      <span className="h-1.5 w-1.5 rounded-full bg-success" />
+      <span className="text-foreground">{region === "bd" ? "৳ BDT" : region === "pk" ? "Rs PKR" : "USDT"}</span>
+      <span className="hidden sm:inline">Auto · {region === "bd" ? "Bangladesh IP" : region === "pk" ? "Pakistan IP" : "Worldwide"}</span>
     </div>
   );
 }
