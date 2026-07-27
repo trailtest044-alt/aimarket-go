@@ -64,12 +64,8 @@ function getOrderToken(orderId: string): string | null { return getOrderTokens()
 
 async function http<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers: Record<string, string> = { "Content-Type": "application/json", ...(init.headers as Record<string, string> | undefined) };
-  const token = getToken();
+  const token = path.startsWith("/admin") ? getToken() : getCustomerToken();
   if (token) headers.Authorization = `Bearer ${token}`;
-  else {
-    const customerToken = getCustomerToken();
-    if (customerToken) headers.Authorization = `Bearer ${customerToken}`;
-  }
   const res = await fetch(`${API_BASE_URL}${path}`, { ...init, headers });
   if (!res.ok) {
     let message = `Request failed: ${res.status}`;
