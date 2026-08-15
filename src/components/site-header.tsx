@@ -29,6 +29,42 @@ import {
 } from "@/lib/api";
 import type { Product } from "@/lib/mock-data";
 
+const SEARCH_HISTORY_KEY = "aimarket_search_history";
+
+function getSearchHistory(): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(SEARCH_HISTORY_KEY) || "[]");
+    return Array.isArray(parsed)
+      ? parsed.filter((item): item is string => typeof item === "string").slice(0, 4)
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveSearchHistory(query: string) {
+  if (typeof window === "undefined") return;
+  const cleaned = query.trim();
+  if (!cleaned) return;
+  const next = [
+    cleaned,
+    ...getSearchHistory().filter((item) => item.toLowerCase() !== cleaned.toLowerCase()),
+  ].slice(0, 4);
+  window.localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(next));
+}
+
+function productSearchText(product: Product) {
+  return [
+    product.name,
+    product.category,
+    product.shortDescription,
+    product.description,
+    product.deliveryMode,
+    product.features?.join(" "),
+  ].join(" ").toLowerCase();
+}
+
 export function SiteHeader() {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
