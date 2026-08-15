@@ -87,7 +87,7 @@ function PromoCodesPage() {
                 <div className="text-xs text-muted-foreground">{p.description || "—"}</div>
               </div>
               <div className="text-sm font-semibold text-gold">
-                {p.discountType === "percent" ? `${p.percentOff}% off` : `৳${p.fixedBDT} / ${p.fixedUSDT} USDT off`}
+                {p.discountType === "percent" ? `${p.percentOff}% off` : `৳${p.fixedBDT} / Rs ${p.fixedPKR} / ${p.fixedUSDT} USDT off`}
               </div>
               <div className="text-xs text-muted-foreground">
                 Used {p.usedCount}{p.maxUses > 0 ? ` / ${p.maxUses}` : " · unlimited"}
@@ -133,11 +133,13 @@ function PromoCodesPage() {
               ) : (
                 <>
                   <NumF label="BDT off (৳)" value={form.fixedBDT} onChange={(v) => setForm({ ...form, fixedBDT: v })} />
+                  <NumF label="PKR off (Rs)" value={form.fixedPKR} onChange={(v) => setForm({ ...form, fixedPKR: v })} />
                   <NumF label="USDT off ($)" value={form.fixedUSDT} onChange={(v) => setForm({ ...form, fixedUSDT: v })} />
                 </>
               )}
               <NumF label="Max uses (0 = unlimited)" value={form.maxUses} onChange={(v) => setForm({ ...form, maxUses: Math.round(v) })} />
               <NumF label="Min order BDT (0 = none)" value={form.minAmountBDT} onChange={(v) => setForm({ ...form, minAmountBDT: v })} />
+              <NumF label="Min order PKR (0 = none)" value={form.minAmountPKR} onChange={(v) => setForm({ ...form, minAmountPKR: v })} />
               <NumF label="Min order USDT (0 = none)" value={form.minAmountUSDT} onChange={(v) => setForm({ ...form, minAmountUSDT: v })} />
 
               <label className="block">

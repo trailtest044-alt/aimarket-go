@@ -46,7 +46,7 @@ import type { AttentionItem, CurrencyCode, DashboardChartRow, MoneyBag, ProductP
 
 export const Route = createFileRoute("/admin/")({ component: AdminDashboard });
 
-const currencies: CurrencyCode[] = ["BDT", "USDT"];
+const currencies: CurrencyCode[] = ["BDT", "PKR", "USDT"];
 const DASHBOARD_LIVE_REFRESH_MS = 5_000;
 
 function dhakaDateInputValue(date: Date) {
@@ -118,7 +118,7 @@ function AdminDashboard() {
                 </div>
               )}
               <select value={currency} onChange={(e) => setCurrency(e.target.value as CurrencyCode)} className="rounded-xl border border-border bg-card px-3 py-2 text-xs font-bold outline-none">
-                {currencies.map((code) => <option key={code} value={code}>{code} lane</option>)}
+                {currencies.map((code) => <option key={code} value={code}>{code}</option>)}
               </select>
               <button onClick={() => refetch()} className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-xs font-bold shadow-sm hover:bg-secondary">
                 <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} /> Refresh

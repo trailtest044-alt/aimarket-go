@@ -252,6 +252,7 @@ function AdminProductsPage() {
                   <td className="px-4 py-3 whitespace-nowrap">{p.category}</td>
                   <td className="px-4 py-3 text-xs whitespace-nowrap">
                     <div>{formatMoney(p.priceBDT, "BDT")}</div>
+                    <div>{formatMoney(p.pricePKR, "PKR")}</div>
                     <div>{formatMoney(p.priceUSDT, p.worldwideCurrency)}</div>
                   </td>
                   <td className="px-4 py-3"><span className="inline-flex whitespace-nowrap rounded-full border border-border bg-card px-3 py-1.5 text-[10px] font-bold uppercase text-muted-foreground">{deliveryLabel(p.deliveryMode)}</span></td>
@@ -300,8 +301,9 @@ function EditModal({ product, existing, onClose, onSave }: { product: Product; e
   const [selectedResellerIds, setSelectedResellerIds] = useState<string[]>([]);
   const [samePriceForAll, setSamePriceForAll] = useState(true);
   const [sharedResellerPriceBDT, setSharedResellerPriceBDT] = useState("");
+  const [sharedResellerPricePKR, setSharedResellerPricePKR] = useState("");
   const [sharedResellerPriceUSDT, setSharedResellerPriceUSDT] = useState("");
-  const [individualPrices, setIndividualPrices] = useState<Record<string, { bdt: string; usdt: string }>>({});
+  const [individualPrices, setIndividualPrices] = useState<Record<string, { bdt: string; pkr: string; usdt: string }>>({});
   const { data: resellers = [], isLoading: resellersLoading } = useQuery({
     queryKey: ["admin-resellers-for-product"],
     queryFn: () => getResellers(),
@@ -320,12 +322,14 @@ function EditModal({ product, existing, onClose, onSave }: { product: Product; e
 
   function resellerAssignments(): NewProductResellerAssignment[] {
     return selectedResellerIds.map((resellerId) => {
-      const own = individualPrices[resellerId] || { bdt: "", usdt: "" };
+      const own = individualPrices[resellerId] || { bdt: "", pkr: "", usdt: "" };
       const bdt = samePriceForAll ? sharedResellerPriceBDT : own.bdt;
+      const pkr = samePriceForAll ? sharedResellerPricePKR : own.pkr;
       const usdt = samePriceForAll ? sharedResellerPriceUSDT : own.usdt;
       return {
         resellerId,
         priceBDT: bdt === "" ? null : Math.max(0, Number(bdt) || 0),
+        pricePKR: pkr === "" ? null : Math.max(0, Number(pkr) || 0),
         priceUSDT: usdt === "" ? null : Math.max(0, Number(usdt) || 0),
       };
     });
@@ -389,17 +393,19 @@ function EditModal({ product, existing, onClose, onSave }: { product: Product; e
           <Input label="Icon fallback" value={p.icon} onChange={(v) => setP({ ...p, icon: v })} />
           <Input label="Badge" value={p.badge ?? ""} onChange={(v) => setP({ ...p, badge: v || undefined })} />
           <Input label="BDT Price" type="number" value={String(p.priceBDT)} onChange={(v) => setP({ ...p, priceBDT: parseFloat(v) || 0 })} />
-          <Input label="Worldwide Price" type="number" value={String(p.priceUSDT)} onChange={(v) => setP({ ...p, priceUSDT: parseFloat(v) || 0 })} />
+          <Input label="PKR Price" type="number" value={String(p.pricePKR)} onChange={(v) => setP({ ...p, pricePKR: parseFloat(v) || 0 })} />
+          <Input label="USDT Price" type="number" value={String(p.priceUSDT)} onChange={(v) => setP({ ...p, priceUSDT: parseFloat(v) || 0 })} />
           <label className="sm:col-span-2 flex cursor-pointer items-center justify-between gap-4 rounded-2xl border border-emerald-300/60 bg-emerald-50/70 p-4 text-emerald-950">
             <span>
               <span className="block text-sm font-bold">Free product — no payment required</span>
               <span className="mt-1 block text-xs leading-5">Buyer submits once and available stock is delivered automatically. Manual-delivery and backorder items still wait for fulfilment.</span>
             </span>
-            <input type="checkbox" checked={p.isFree === true} onChange={(event) => setP(event.target.checked ? { ...p, isFree: true, priceBDT: 0, priceUSDT: 0, originalPriceBDT: 0, originalPriceUSDT: 0 } : { ...p, isFree: false })} className="h-5 w-5 shrink-0 accent-emerald-600" />
+            <input type="checkbox" checked={p.isFree === true} onChange={(event) => setP(event.target.checked ? { ...p, isFree: true, priceBDT: 0, pricePKR: 0, priceUSDT: 0, originalPriceBDT: 0, originalPricePKR: 0, originalPriceUSDT: 0 } : { ...p, isFree: false })} className="h-5 w-5 shrink-0 accent-emerald-600" />
           </label>
           <div className="rounded-xl border border-border bg-secondary/30 px-3 py-2.5 text-sm font-semibold text-muted-foreground">Worldwide currency: USDT</div>
           <Input label="Original BDT Price" type="number" value={String(p.originalPriceBDT ?? "")} onChange={(v) => setP({ ...p, originalPriceBDT: v ? parseFloat(v) : undefined })} />
-          <Input label="Original Worldwide Price" type="number" value={String(p.originalPriceUSDT ?? "")} onChange={(v) => setP({ ...p, originalPriceUSDT: v ? parseFloat(v) : undefined })} />
+          <Input label="Original PKR Price" type="number" value={String(p.originalPricePKR ?? "")} onChange={(v) => setP({ ...p, originalPricePKR: v ? parseFloat(v) : undefined })} />
+          <Input label="Original USDT Price" type="number" value={String(p.originalPriceUSDT ?? "")} onChange={(v) => setP({ ...p, originalPriceUSDT: v ? parseFloat(v) : undefined })} />
           <label className="sm:col-span-2 flex cursor-pointer items-center justify-between gap-4 rounded-2xl border border-border bg-card/70 p-4">
             <span>
               <span className="block text-sm font-bold">Show on website</span>
@@ -427,7 +433,7 @@ function EditModal({ product, existing, onClose, onSave }: { product: Product; e
               <div className="mt-3 max-h-48 space-y-2 overflow-y-auto pr-1">
                 {resellersLoading ? <div className="rounded-xl border border-border bg-card p-4 text-center text-xs text-muted-foreground">Loading resellers...</div> : visibleResellers.length === 0 ? <div className="rounded-xl border border-border bg-card p-4 text-center text-xs text-muted-foreground">No eligible reseller found.</div> : visibleResellers.map((reseller) => {
                   const selected = selectedResellerIds.includes(reseller.id);
-                  const own = individualPrices[reseller.id] || { bdt: "", usdt: "" };
+                  const own = individualPrices[reseller.id] || { bdt: "", pkr: "", usdt: "" };
                   return (
                     <div key={reseller.id} className={`rounded-xl border p-3 transition ${selected ? "border-primary/40 bg-card shadow-sm" : "border-border bg-card/60"}`}>
                       <div className="flex items-center gap-3">
@@ -435,14 +441,14 @@ function EditModal({ product, existing, onClose, onSave }: { product: Product; e
                         <button type="button" onClick={() => toggleReseller(reseller)} className="min-w-0 flex-1 text-left"><div className="truncate text-sm font-bold">{reseller.name || reseller.email.split("@")[0]}</div><div className="truncate text-xs text-muted-foreground">{reseller.email}</div></button>
                         <span className="rounded-full bg-secondary px-2 py-1 text-[10px] font-bold uppercase text-muted-foreground">{reseller.status}</span>
                       </div>
-                      {selected && !samePriceForAll && <div className="mt-3 grid grid-cols-2 gap-2"><Input label="Reseller BDT price" type="number" value={own.bdt} onChange={(value) => setIndividualPrices((current) => ({ ...current, [reseller.id]: { ...own, bdt: value } }))} /><Input label="Reseller USDT price" type="number" value={own.usdt} onChange={(value) => setIndividualPrices((current) => ({ ...current, [reseller.id]: { ...own, usdt: value } }))} /></div>}
+                      {selected && !samePriceForAll && <div className="mt-3 grid gap-2 sm:grid-cols-3"><Input label="Reseller BDT price" type="number" value={own.bdt} onChange={(value) => setIndividualPrices((current) => ({ ...current, [reseller.id]: { ...own, bdt: value } }))} /><Input label="Reseller PKR price" type="number" value={own.pkr} onChange={(value) => setIndividualPrices((current) => ({ ...current, [reseller.id]: { ...own, pkr: value } }))} /><Input label="Reseller USDT price" type="number" value={own.usdt} onChange={(value) => setIndividualPrices((current) => ({ ...current, [reseller.id]: { ...own, usdt: value } }))} /></div>}
                     </div>
                   );
                 })}
               </div>
               {selectedResellerIds.length > 0 && <div className="mt-3 rounded-xl border border-border bg-card p-3">
                 <label className="flex cursor-pointer items-center gap-2 text-sm font-bold"><input type="checkbox" checked={samePriceForAll} onChange={(event) => setSamePriceForAll(event.target.checked)} className="h-4 w-4 accent-primary" /> Same price for all selected resellers</label>
-                {samePriceForAll && <div className="mt-3 grid gap-3 sm:grid-cols-2"><Input label="Shared reseller BDT price" type="number" value={sharedResellerPriceBDT} onChange={setSharedResellerPriceBDT} /><Input label="Shared reseller USDT price" type="number" value={sharedResellerPriceUSDT} onChange={setSharedResellerPriceUSDT} /></div>}
+                {samePriceForAll && <div className="mt-3 grid gap-3 sm:grid-cols-3"><Input label="Shared reseller BDT price" type="number" value={sharedResellerPriceBDT} onChange={setSharedResellerPriceBDT} /><Input label="Shared reseller PKR price" type="number" value={sharedResellerPricePKR} onChange={setSharedResellerPricePKR} /><Input label="Shared reseller USDT price" type="number" value={sharedResellerPriceUSDT} onChange={setSharedResellerPriceUSDT} /></div>}
                 <p className="mt-2 text-xs text-muted-foreground">Leave a price blank to use the product's normal price for that currency.</p>
               </div>}
             </div>
@@ -452,13 +458,17 @@ function EditModal({ product, existing, onClose, onSave }: { product: Product; e
             <p className="mt-1 text-xs text-muted-foreground">Used only for real dashboard net profit. Leave blank if unknown.</p>
             <div className="mt-3 grid gap-3 sm:grid-cols-3">
               <Input label="Purchase cost BDT" type="number" value={String(p.purchaseCostBDT ?? "")} onChange={(v) => setP({ ...p, purchaseCostBDT: parseFloat(v) || 0 })} />
-              <Input label="Purchase cost World" type="number" value={String(p.purchaseCostUSDT ?? "")} onChange={(v) => setP({ ...p, purchaseCostUSDT: parseFloat(v) || 0 })} />
+              <Input label="Purchase cost PKR" type="number" value={String(p.purchaseCostPKR ?? "")} onChange={(v) => setP({ ...p, purchaseCostPKR: parseFloat(v) || 0 })} />
+              <Input label="Purchase cost USDT" type="number" value={String(p.purchaseCostUSDT ?? "")} onChange={(v) => setP({ ...p, purchaseCostUSDT: parseFloat(v) || 0 })} />
               <Input label="Account cost BDT" type="number" value={String(p.accountCostBDT ?? "")} onChange={(v) => setP({ ...p, accountCostBDT: parseFloat(v) || 0 })} />
-              <Input label="Account cost World" type="number" value={String(p.accountCostUSDT ?? "")} onChange={(v) => setP({ ...p, accountCostUSDT: parseFloat(v) || 0 })} />
+              <Input label="Account cost PKR" type="number" value={String(p.accountCostPKR ?? "")} onChange={(v) => setP({ ...p, accountCostPKR: parseFloat(v) || 0 })} />
+              <Input label="Account cost USDT" type="number" value={String(p.accountCostUSDT ?? "")} onChange={(v) => setP({ ...p, accountCostUSDT: parseFloat(v) || 0 })} />
               <Input label="Gateway fee BDT" type="number" value={String(p.paymentGatewayFeeBDT ?? "")} onChange={(v) => setP({ ...p, paymentGatewayFeeBDT: parseFloat(v) || 0 })} />
-              <Input label="Gateway fee World" type="number" value={String(p.paymentGatewayFeeUSDT ?? "")} onChange={(v) => setP({ ...p, paymentGatewayFeeUSDT: parseFloat(v) || 0 })} />
+              <Input label="Gateway fee PKR" type="number" value={String(p.paymentGatewayFeePKR ?? "")} onChange={(v) => setP({ ...p, paymentGatewayFeePKR: parseFloat(v) || 0 })} />
+              <Input label="Gateway fee USDT" type="number" value={String(p.paymentGatewayFeeUSDT ?? "")} onChange={(v) => setP({ ...p, paymentGatewayFeeUSDT: parseFloat(v) || 0 })} />
               <Input label="Other expense BDT" type="number" value={String(p.otherExpenseBDT ?? "")} onChange={(v) => setP({ ...p, otherExpenseBDT: parseFloat(v) || 0 })} />
-              <Input label="Other expense World" type="number" value={String(p.otherExpenseUSDT ?? "")} onChange={(v) => setP({ ...p, otherExpenseUSDT: parseFloat(v) || 0 })} />
+              <Input label="Other expense PKR" type="number" value={String(p.otherExpensePKR ?? "")} onChange={(v) => setP({ ...p, otherExpensePKR: parseFloat(v) || 0 })} />
+              <Input label="Other expense USDT" type="number" value={String(p.otherExpenseUSDT ?? "")} onChange={(v) => setP({ ...p, otherExpenseUSDT: parseFloat(v) || 0 })} />
             </div>
           </div>
           <Select label="Delivery system" value={p.deliveryMode || "credentials"} onChange={(v) => setP({ ...p, deliveryMode: v as DeliveryMode })} options={deliveryOptions} />

@@ -115,6 +115,7 @@ function ResellerDetailPage() {
       await updateResellerProductAccess(id, config.product._id, {
         isVisible: data.get("visible") === "on",
         priceBDT: numberOrNull("bdt"),
+        pricePKR: numberOrNull("pkr"),
         priceUSDT: numberOrNull("usdt"),
         priceUSD: numberOrNull("usd"),
         note: String(data.get("note") || ""),
@@ -357,6 +358,7 @@ function ResellerDetailPage() {
                   className="mt-1.5 w-full rounded-xl border border-border bg-white px-3 py-2.5 text-sm text-foreground"
                 >
                   <option>BDT</option>
+                  <option>PKR</option>
                   <option>USDT</option>
                   <option>USD</option>
                 </select>
@@ -620,7 +622,7 @@ function ProductAccessForm({
         <div>
           <div className="font-bold">{config.product.title}</div>
           <div className="text-xs text-muted-foreground">
-            Default: {formatMoney(config.product.priceBDT ?? 0, "BDT")} · {config.product.priceUSDT ?? 0} USDT
+            Default: {formatMoney(config.product.priceBDT ?? 0, "BDT")} · {formatMoney(config.product.pricePKR ?? 0, "PKR")} · {formatMoney(config.product.priceUSDT ?? 0, "USDT")}
           </div>
         </div>
         <label className="inline-flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-sm font-bold">
@@ -637,6 +639,11 @@ function ProductAccessForm({
           name="bdt"
           label="BDT price"
           defaultValue={access?.priceBDT}
+        />
+        <MiniField
+          name="pkr"
+          label="PKR price"
+          defaultValue={access?.pricePKR}
         />
         <MiniField
           name="usdt"
