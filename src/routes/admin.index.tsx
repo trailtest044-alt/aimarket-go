@@ -95,7 +95,7 @@ function AdminDashboard() {
           <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
             <div>
               <p className="text-sm text-muted-foreground">Overview of your store performance</p>
-              <h2 className="mt-1 text-xl font-bold tracking-tight">Real-time Plandaw analytics</h2>
+              <h2 className="mt-1 text-xl font-bold tracking-tight">Real-time AI Market analytics</h2>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <div className="inline-flex rounded-xl border border-border bg-secondary/40 p-1">
@@ -501,7 +501,7 @@ function exportDashboardCsv(data: any, currency: CurrencyCode) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `plandaw-dashboard-${currency}.csv`;
+  a.download = `aimarket-dashboard-${currency}.csv`;
   a.click();
   URL.revokeObjectURL(url);
 }

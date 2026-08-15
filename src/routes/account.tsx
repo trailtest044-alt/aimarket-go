@@ -7,7 +7,7 @@ import {
   Copy,
   KeyRound,
   LogOut,
-  Mail,
+
   PackageCheck,
   RefreshCw,
   Search,
@@ -28,9 +28,9 @@ import {
   getPaymentSettings,
   submitResellerPaymentRequest,
   logoutCustomer,
-  requestCustomerEmailCode,
+
   startGoogleLogin,
-  verifyCustomerEmailCode,
+
   type CustomerSession,
   type DeliveryPayload,
 } from "@/lib/api";
@@ -68,11 +68,6 @@ function AccountPage() {
     transactionId: "",
     note: "",
   });
-  const [loginMethod, setLoginMethod] = useState<"choice" | "email">("choice");
-  const [loginEmail, setLoginEmail] = useState("");
-  const [loginCode, setLoginCode] = useState("");
-  const [codeSent, setCodeSent] = useState(false);
-  const [authBusy, setAuthBusy] = useState(false);
   const [resellerHistoryDate, setResellerHistoryDate] = useState(todayDhakaKey);
   const [customerOrderDate, setCustomerOrderDate] = useState(todayDhakaKey);
 
@@ -85,58 +80,6 @@ function AccountPage() {
     window.addEventListener("customer-auth-changed", sync);
     return () => window.removeEventListener("customer-auth-changed", sync);
   }, []);
-
-  useEffect(() => {
-    if (new URLSearchParams(window.location.search).get("method") === "email")
-      setLoginMethod("email");
-  }, []);
-
-  async function sendEmailCode(event?: React.FormEvent) {
-    event?.preventDefault();
-    const email = loginEmail.trim().toLowerCase();
-    if (!/^\S+@\S+\.\S+$/.test(email))
-      return toast.error("Enter a valid email address.");
-    setAuthBusy(true);
-    try {
-      await requestCustomerEmailCode(email);
-      setLoginEmail(email);
-      setCodeSent(true);
-      setLoginCode("");
-      toast.success("Verification code sent. Check your inbox.");
-    } catch (error) {
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : "Could not send the verification code.",
-      );
-    } finally {
-      setAuthBusy(false);
-    }
-  }
-
-  async function verifyEmailCode(event: React.FormEvent) {
-    event.preventDefault();
-    if (!/^\d{6}$/.test(loginCode.trim()))
-      return toast.error("Enter the 6-digit code from your email.");
-    setAuthBusy(true);
-    try {
-      const signedInCustomer = await verifyCustomerEmailCode(
-        loginEmail,
-        loginCode,
-      );
-      setCustomer(signedInCustomer);
-      toast.success("Email verified. You are signed in.");
-      window.history.replaceState({}, "", "/account");
-    } catch (error) {
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : "The verification code could not be confirmed.",
-      );
-    } finally {
-      setAuthBusy(false);
-    }
-  }
 
   const ordersQuery = useQuery({
     queryKey: ["customer-orders", customer?.email],
@@ -288,7 +231,7 @@ function AccountPage() {
                     Secure customer account
                   </span>
                   <h1 className="display-luxe mt-3 text-3xl font-black leading-tight sm:text-4xl">
-                    One account for every Plandaw order.
+                    One account for every AI Market order.
                   </h1>
                   <p className="mt-4 max-w-md text-sm leading-7 text-white/70">
                     View purchases, delivery details, reseller statements and
@@ -312,146 +255,28 @@ function AccountPage() {
               </section>
 
               <section className="bg-background/80 p-7 sm:p-10">
-                <span className="eyebrow">Welcome to Plandaw</span>
+                <span className="eyebrow">Welcome to AI Market</span>
                 <h2 className="display-luxe mt-2 text-3xl font-black">
                   Sign in to your account
                 </h2>
                 <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                  Choose Google or verify your email address. Your customer
-                  profile stays saved securely on our server.
+                  Continue securely with your Google account. Orders placed with the same Google email are linked automatically.
                 </p>
-
-                {loginMethod === "choice" ? (
-                  <div className="mt-8 space-y-3">
-                    <button
-                      type="button"
-                      onClick={() => startGoogleLogin("/account")}
-                      className="btn-primary flex w-full items-center justify-between rounded-2xl px-5 py-4 text-sm font-bold"
-                    >
-                      <span className="flex items-center gap-3">
-                        <span className="grid h-8 w-8 place-items-center rounded-full bg-white font-black text-[#4285f4]">
-                          G
-                        </span>{" "}
-                        Continue with Google
-                      </span>
-                      <ArrowRight className="h-4 w-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setLoginMethod("email")}
-                      className="btn-ghost flex w-full items-center justify-between rounded-2xl border border-border px-5 py-4 text-sm font-bold"
-                    >
-                      <span className="flex items-center gap-3">
-                        <Mail className="h-5 w-5" /> Continue with email address
-                      </span>
-                      <ArrowRight className="h-4 w-4" />
-                    </button>
-                  </div>
-                ) : (
-                  <form
-                    onSubmit={codeSent ? verifyEmailCode : sendEmailCode}
-                    className="mt-8 space-y-5"
+                <div className="mt-8">
+                  <button
+                    type="button"
+                    onClick={() => startGoogleLogin("/account")}
+                    className="btn-primary flex w-full items-center justify-between rounded-2xl px-5 py-4 text-sm font-bold"
                   >
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setLoginMethod("choice");
-                        setCodeSent(false);
-                        setLoginCode("");
-                      }}
-                      className="text-sm font-semibold text-muted-foreground hover:text-foreground"
-                    >
-                      ← All sign-in options
-                    </button>
-                    <div>
-                      <label
-                        htmlFor="login-email"
-                        className="mb-2 block text-sm font-bold"
-                      >
-                        Email address
-                      </label>
-                      <div className="flex items-center gap-3 rounded-2xl border border-border bg-white px-4 focus-within:border-primary/60 focus-within:ring-4 focus-within:ring-primary/10">
-                        <AtSign className="h-4 w-4 text-muted-foreground" />
-                        <input
-                          id="login-email"
-                          type="email"
-                          required
-                          autoComplete="email"
-                          disabled={codeSent || authBusy}
-                          value={loginEmail}
-                          onChange={(event) =>
-                            setLoginEmail(event.target.value)
-                          }
-                          placeholder="you@example.com"
-                          className="min-w-0 flex-1 bg-transparent py-4 text-sm outline-none disabled:opacity-70"
-                        />
-                      </div>
-                    </div>
-                    {codeSent && (
-                      <div>
-                        <label
-                          htmlFor="login-code"
-                          className="mb-2 block text-sm font-bold"
-                        >
-                          6-digit verification code
-                        </label>
-                        <input
-                          id="login-code"
-                          inputMode="numeric"
-                          autoComplete="one-time-code"
-                          maxLength={6}
-                          required
-                          autoFocus
-                          value={loginCode}
-                          onChange={(event) =>
-                            setLoginCode(
-                              event.target.value.replace(/\D/g, "").slice(0, 6),
-                            )
-                          }
-                          placeholder="000000"
-                          className="w-full rounded-2xl border border-border bg-white px-4 py-4 text-center font-mono text-2xl font-black tracking-[0.45em] outline-none focus:border-primary/60 focus:ring-4 focus:ring-primary/10"
-                        />
-                        <p className="mt-2 text-xs text-muted-foreground">
-                          We sent the code to{" "}
-                          <b className="text-foreground">{loginEmail}</b>. It
-                          expires in 10 minutes.
-                        </p>
-                      </div>
-                    )}
-                    <button
-                      type="submit"
-                      disabled={authBusy}
-                      className="btn-primary flex w-full items-center justify-center gap-2 rounded-2xl px-5 py-4 text-sm font-bold disabled:cursor-wait disabled:opacity-60"
-                    >
-                      {authBusy ? (
-                        <RefreshCw className="h-4 w-4 animate-spin" />
-                      ) : codeSent ? (
-                        <KeyRound className="h-4 w-4" />
-                      ) : (
-                        <Mail className="h-4 w-4" />
-                      )}
-                      {authBusy
-                        ? "Please wait..."
-                        : codeSent
-                          ? "Verify code & sign in"
-                          : "Send verification code"}
-                    </button>
-                    {codeSent && (
-                      <button
-                        type="button"
-                        disabled={authBusy}
-                        onClick={() => void sendEmailCode()}
-                        className="w-full text-center text-xs font-semibold text-muted-foreground hover:text-foreground"
-                      >
-                        Send a new code
-                      </button>
-                    )}
-                  </form>
-                )}
+                    <span className="flex items-center gap-3">
+                      <span className="grid h-8 w-8 place-items-center rounded-full bg-white font-black text-[#4285f4]">G</span>
+                      Continue with Google
+                    </span>
+                    <ArrowRight className="h-4 w-4" />
+                  </button>
+                </div>
                 <p className="mt-7 border-t border-border pt-5 text-xs leading-5 text-muted-foreground">
-                  For your security, entering an email alone never opens an
-                  account. We verify ownership with a one-time code before
-                  showing order data.
+                  AI Market never asks for or stores your Google password.
                 </p>
               </section>
             </div>

@@ -74,10 +74,10 @@ function AdminProductsPage() {
 
   useEffect(() => setOrdered(reindex(sortProducts(products))), [products]);
   useEffect(() => {
-    const stored = window.sessionStorage.getItem("plandaw_admin_search_query");
+    const stored = window.sessionStorage.getItem("aimarket_admin_search_query");
     if (stored) {
       setFilter(stored);
-      window.sessionStorage.removeItem("plandaw_admin_search_query");
+      window.sessionStorage.removeItem("aimarket_admin_search_query");
     }
   }, []);
 

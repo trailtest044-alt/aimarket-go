@@ -3,8 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { AdminShell } from "@/components/admin-shell";
-import { getAdminPaymentSettings, updatePaymentSettings } from "@/lib/api";
-import { useAdminAuthReady } from "@/hooks/use-admin-auth-ready";
+import { getPaymentSettings, updatePaymentSettings } from "@/lib/api";
 import type { PaymentSettings } from "@/lib/mock-data";
 import { Save } from "lucide-react";
 
@@ -15,8 +14,7 @@ export const Route = createFileRoute("/admin/payment-settings")({
 
 function PaymentSettingsPage() {
   const qc = useQueryClient();
-  const adminReady = useAdminAuthReady();
-  const { data } = useQuery({ queryKey: ["admin-payment"], queryFn: getAdminPaymentSettings, enabled: adminReady });
+  const { data } = useQuery({ queryKey: ["payment"], queryFn: getPaymentSettings });
   const [form, setForm] = useState<PaymentSettings | null>(null);
 
   useEffect(() => { if (data && !form) setForm(data); }, [data, form]);
@@ -25,25 +23,26 @@ function PaymentSettingsPage() {
 
   async function save() {
     if (!form) return;
-    const saved = await updatePaymentSettings(form);
-    setForm(saved);
-    qc.setQueryData(["admin-payment"], saved);
-    qc.setQueryData(["payment"], saved);
-    await qc.invalidateQueries({ queryKey: ["admin-payment"] });
-    await qc.invalidateQueries({ queryKey: ["payment"] });
-    await qc.refetchQueries({ queryKey: ["admin-payment"], type: "active" });
+    await updatePaymentSettings(form);
+    qc.invalidateQueries({ queryKey: ["payment"] });
     toast.success("Settings saved");
   }
 
   return (
     <AdminShell title="Payment Settings">
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-6 lg:grid-cols-3">
         <Section title="🇧🇩 Bangladesh">
           <F label="bKash" value={form.bangladesh.bkash} onChange={(v) => setForm({ ...form, bangladesh: { ...form.bangladesh, bkash: v } })} />
           <F label="Nagad" value={form.bangladesh.nagad} onChange={(v) => setForm({ ...form, bangladesh: { ...form.bangladesh, nagad: v } })} />
           <TA label="Instructions" value={form.bangladesh.instructions} onChange={(v) => setForm({ ...form, bangladesh: { ...form.bangladesh, instructions: v } })} />
         </Section>
-        <Section title="◆ Worldwide / USDT">
+        <Section title="🇵🇰 Pakistan">
+          <F label="Easypaisa" value={form.pakistan.easypaisa} onChange={(v) => setForm({ ...form, pakistan: { ...form.pakistan, easypaisa: v } })} />
+          <F label="JazzCash" value={form.pakistan.jazzcash} onChange={(v) => setForm({ ...form, pakistan: { ...form.pakistan, jazzcash: v } })} />
+          <F label="Bank" value={form.pakistan.bank} onChange={(v) => setForm({ ...form, pakistan: { ...form.pakistan, bank: v } })} />
+          <TA label="Instructions" value={form.pakistan.instructions} onChange={(v) => setForm({ ...form, pakistan: { ...form.pakistan, instructions: v } })} />
+        </Section>
+        <Section title="🟡 Binance / Crypto">
           <F label="Binance Pay ID" value={form.binance.payId} onChange={(v) => setForm({ ...form, binance: { ...form.binance, payId: v } })} />
           <F label="Wallet Address" value={form.binance.wallet} onChange={(v) => setForm({ ...form, binance: { ...form.binance, wallet: v } })} />
           <TA label="Instructions" value={form.binance.instructions} onChange={(v) => setForm({ ...form, binance: { ...form.binance, instructions: v } })} />

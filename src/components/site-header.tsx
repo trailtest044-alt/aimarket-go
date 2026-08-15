@@ -31,10 +31,11 @@ import type { PriceRegion, Product } from "@/lib/mock-data";
 
 const REGION_OPTIONS: { key: PriceRegion; label: string }[] = [
   { key: "bd", label: "\u09F3 BDT" },
+  { key: "pk", label: "Rs PKR" },
   { key: "world", label: "USDT" },
 ];
 
-const SEARCH_HISTORY_KEY = "plandaw_search_history";
+const SEARCH_HISTORY_KEY = "aimarket_search_history";
 
 function getSearchHistory() {
   if (typeof window === "undefined") return [];
@@ -84,7 +85,7 @@ function RegionSwitcher({ className = "" }: { className?: string }) {
     };
     const onRegionChanged = (event: Event) => {
       const next = (event as CustomEvent<PriceRegion>).detail;
-      if (next === "bd" || next === "world") setRegion(next);
+      if (next === "bd" || next === "pk" || next === "world") setRegion(next);
     };
 
     syncRegion();
@@ -118,7 +119,7 @@ function RegionSwitcher({ className = "" }: { className?: string }) {
       aria-label="Currency"
     >
       <span className="h-1.5 w-1.5 rounded-full bg-success" />
-      <span className="text-foreground">{region === "bd" ? "\u09F3 BDT" : "USDT"}</span>
+      <span className="text-foreground">{REGION_OPTIONS.find((option) => option.key === region)?.label || "USDT"}</span>
     </button>
   );
 }
@@ -451,7 +452,6 @@ export function SiteHeader() {
                   <UserCircle className="h-4 w-4" /> {resellerProfile ? "Reseller account" : "My account"}
                 </Link>
               ) : (
-                <>
                 <button
                   onClick={() => {
                     setOpen(false);
@@ -459,18 +459,8 @@ export function SiteHeader() {
                   }}
                   className="btn-ghost mt-2 inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold"
                 >
-                  <LogIn className="h-4 w-4" /> Login with Google
-                </button>
-                <Link
-                  to="/account"
-                  search={{ method: "email" } as never}
-                  onClick={() => setOpen(false)}
-                  className="btn-ghost inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold"
-                >
-                  <MessageCircle className="h-4 w-4" /> Continue with email address
-                </Link>
-                </>
-              )}
+                  <LogIn className="h-4 w-4" /> Continue with Google
+                </button>              )}
             </div>
           </div>
         )}

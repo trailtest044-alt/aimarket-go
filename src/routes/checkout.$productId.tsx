@@ -35,7 +35,7 @@ import {
 } from "lucide-react";
 
 export const Route = createFileRoute("/checkout/$productId")({ component: CheckoutPage, notFoundComponent: NotFoundProduct });
-type Method = "bangladesh" | "binance" | "reseller_due" | "free";
+type Method = "bangladesh" | "pakistan" | "binance" | "reseller_due" | "free";
 type PaidMethod = Exclude<Method, "reseller_due" | "free">;
 
 /* Map each channel to the account number stored in admin Payment Settings */
@@ -44,8 +44,11 @@ function channelNumber(channel: WalletKey, payment?: PaymentSettings): string {
   switch (channel) {
     case "bKash": return payment.bangladesh.bkash;
     case "Nagad": return payment.bangladesh.nagad;
+    case "Easypaisa": return payment.pakistan.easypaisa;
+    case "JazzCash": return payment.pakistan.jazzcash;
+    case "Bank Transfer": return payment.pakistan.bank;
     case "Binance Pay": return payment.binance.payId;
-    default: return payment.binance.wallet; // USDT TRC20 / BEP20
+    default: return payment.binance.wallet;
   }
 }
 function methodInstructions(method: PaidMethod, payment?: PaymentSettings): string {

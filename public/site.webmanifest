@@ -1,15 +1,15 @@
 {
-  "name": "Plandaw",
-  "short_name": "Plandaw",
-  "description": "Premium AI products and accounts from Plandaw.",
+  "name": "AI Market",
+  "short_name": "AI Market",
+  "description": "Premium AI products and accounts from AI Market.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
+  "background_color": "#15162b",
   "theme_color": "#15162b",
   "icons": [
     {
-      "src": "/plandaw-brand-mark.png",
-      "sizes": "640x640",
+      "src": "/favicon.png",
+      "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     }

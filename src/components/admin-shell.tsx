@@ -89,7 +89,7 @@ export function AdminShell({ title, children }: { title: string; children: React
 
   function openSearchResult(result: AdminSearchResult) {
     if (typeof window !== "undefined" && result.query) {
-      window.sessionStorage.setItem("plandaw_admin_search_query", result.query);
+      window.sessionStorage.setItem("aimarket_admin_search_query", result.query);
     }
     setSearchOpen(false);
     setSearchTerm("");
@@ -100,7 +100,7 @@ export function AdminShell({ title, children }: { title: string; children: React
     const query = searchTerm.trim();
     if (!query) return;
     if (typeof window !== "undefined") {
-      window.sessionStorage.setItem("plandaw_admin_search_query", query);
+      window.sessionStorage.setItem("aimarket_admin_search_query", query);
     }
     setSearchOpen(false);
     navigate({ to: "/admin/track-orders" });
@@ -151,7 +151,7 @@ export function AdminShell({ title, children }: { title: string; children: React
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h1 className="font-display text-2xl font-black tracking-tight">{title}</h1>
-                <p className="text-sm text-muted-foreground">Welcome back{current?.nickname ? `, ${current.nickname}` : ""}. Manage Plandaw faster.</p>
+                <p className="text-sm text-muted-foreground">Welcome back{current?.nickname ? `, ${current.nickname}` : ""}. Manage AI Market faster.</p>
               </div>
               <div className="flex flex-1 flex-wrap items-center justify-end gap-2">
                 <div className="relative hidden w-full min-w-[280px] max-w-[390px] xl:block">

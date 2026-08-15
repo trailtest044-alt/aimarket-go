@@ -29,7 +29,7 @@ export const Route = createFileRoute("/")({
       { property: "og:title", content: `${BRAND.name} — Premium AI Products` },
       { property: "og:description", content: BRAND.tagline },
     ],
-    links: [{ rel: "canonical", href: "https://plandaw.com/" }],
+    links: [],
   }),
   component: HomePage,
 });
@@ -383,7 +383,7 @@ function HomePage() {
 
       <section className="page-shell-wide mx-auto mt-16">
         <Reveal>
-          <span className="eyebrow">Why choose Plandaw?</span>
+          <span className="eyebrow">Why choose AI Market?</span>
           <h2 className="mt-3 font-display text-2xl font-bold sm:text-3xl">Support that stays human.</h2>
         </Reveal>
         <div className="mt-7 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

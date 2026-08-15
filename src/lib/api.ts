@@ -30,10 +30,7 @@ import {
   mockPromoCodes,
 } from "./mock-data";
 
-// Keep browser traffic on the storefront origin. The low-RAM Node entry
-// proxies /api to the backend, avoiding ISP/VPN/DNS failures that affect the
-// api subdomain on some devices.
-const DEFAULT_API_BASE_URL = typeof window !== "undefined" ? "/api" : "https://api.plandaw.com/api";
+const DEFAULT_API_BASE_URL = "https://aimarket-u138.onrender.com/api";
 
 export const API_BASE_URL: string =
   ((import.meta.env.VITE_API_BASE_URL as string | undefined) || DEFAULT_API_BASE_URL).replace(/\/$/, "");
@@ -62,7 +59,7 @@ const STORAGE_KEYS = {
 
 const isBrowser = typeof window !== "undefined";
 const objectIdRe = /^[a-f\d]{24}$/i;
-const REGION_CACHE_VERSION = 6;
+const REGION_CACHE_VERSION = 7;
 const PRODUCT_DEDUPE_MS = 30_000;
 let productsInFlight: Promise<Product[]> | null = null;
 let productsCache: { at: number; list: Product[] } | null = null;
@@ -189,14 +186,14 @@ export function formatMoney(amount: number, currency: CurrencyCode = "USDT") {
   return `${Number(amount).toFixed(2)} ${currency}`;
 }
 export function priceForRegion(product: Product, region: PriceRegion) {
-  const regionalAmount = region === "bd" ? product.priceBDT : product.priceUSDT;
-  if (product.isFree || Number(regionalAmount || 0) <= 0) return { amount: 0, currency: region === "bd" ? "BDT" as CurrencyCode : "USDT" as CurrencyCode };
-  if (region === "bd") return { amount: product.priceBDT, currency: "BDT" as CurrencyCode };
-  return { amount: product.priceUSDT, currency: "USDT" as CurrencyCode };
+  const regionalAmount = region === "bd" ? product.priceBDT : region === "pk" ? product.pricePKR : product.priceUSDT;
+  const currency = region === "bd" ? "BDT" as CurrencyCode : region === "pk" ? "PKR" as CurrencyCode : (product.worldwideCurrency || "USDT") as CurrencyCode;
+  if (product.isFree || Number(regionalAmount || 0) <= 0) return { amount: 0, currency };
+  return { amount: regionalAmount, currency };
 }
-export function methodForRegion(region: PriceRegion): "bangladesh" | "binance" { return region === "bd" ? "bangladesh" : "binance"; }
-export function allowedPaymentMethods(region: PriceRegion): Array<"bangladesh" | "binance"> { return region === "bd" ? ["bangladesh"] : ["binance"]; }
-export function priceRegionForPaymentMethod(method: Order["paymentMethod"]): PriceRegion { return method === "bangladesh" || method === "reseller_due" || method === "free" ? "bd" : "world"; }
+export function methodForRegion(region: PriceRegion): "bangladesh" | "pakistan" | "binance" { return region === "bd" ? "bangladesh" : region === "pk" ? "pakistan" : "binance"; }
+export function allowedPaymentMethods(region: PriceRegion): Array<"bangladesh" | "pakistan" | "binance"> { return region === "bd" ? ["bangladesh"] : ["pakistan", "binance"]; }
+export function priceRegionForPaymentMethod(method: Order["paymentMethod"]): PriceRegion { if (method === "bangladesh" || method === "reseller_due" || method === "free") return "bd"; if (method === "pakistan") return "pk"; return "world"; }
 
 function freshPath(path: string): string {
   const separator = path.includes("?") ? "&" : "?";
@@ -209,12 +206,13 @@ function normalizeCountryCode(value: unknown): string {
 
 function regionFromCountry(country: string): PriceRegion {
   if (country === "BD") return "bd";
+  if (country === "PK") return "pk";
   return "world";
 }
 
 function normalizeStoredRegion(value: StoredRegion): PriceRegion {
-  if (value === "bd" || value === "world") return value;
-  if (value && typeof value === "object" && (value.region === "bd" || value.region === "world")) return value.region;
+  if (value === "bd" || value === "pk" || value === "world") return value;
+  if (value && typeof value === "object" && (value.region === "bd" || value.region === "pk" || value.region === "world")) return value.region;
   return "world";
 }
 
@@ -263,9 +261,10 @@ async function detectClientCountry(): Promise<string> {
 
 function productToFrontend(p: BackendProduct): Product {
   const priceBDT = money(p.priceBDT);
+  const pricePKR = money(p.pricePKR);
   const priceUSDT = money(p.priceUSDT);
   const displayRegion = p.displayPrice?.region || normalizeStoredRegion(load<StoredRegion>(STORAGE_KEYS.region, "world"));
-  const display = p.displayPrice || (displayRegion === "bd" ? { amount: priceBDT, currency: "BDT" as CurrencyCode, region: "bd" as PriceRegion } : { amount: priceUSDT, currency: "USDT" as CurrencyCode, region: "world" as PriceRegion });
+  const display = p.displayPrice || (displayRegion === "bd" ? { amount: priceBDT, currency: "BDT" as CurrencyCode, region: "bd" as PriceRegion } : displayRegion === "pk" ? { amount: pricePKR, currency: "PKR" as CurrencyCode, region: "pk" as PriceRegion } : { amount: priceUSDT, currency: (p.worldwideCurrency || "USDT") as CurrencyCode, region: "world" as PriceRegion });
   return {
     id: p.slug || p._id,
     backendId: p._id,
@@ -274,10 +273,10 @@ function productToFrontend(p: BackendProduct): Product {
     price: p.isFree === true || money(display.amount) <= 0 ? 0 : money(display.amount),
     currency: display.currency,
     priceRegion: display.region,
-    priceBDT, pricePKR: 0, priceUSDT,
+    priceBDT, pricePKR, priceUSDT,
     isFree: p.isFree === true,
     worldwideCurrency: p.worldwideCurrency || "USDT",
-    originalPrice: p.isFree === true || money(display.amount) <= 0 ? 0 : (display.region === "bd" ? money(p.originalPriceBDT) : money(p.originalPriceUSDT)),
+    originalPrice: p.isFree === true || money(display.amount) <= 0 ? 0 : (display.region === "bd" ? money(p.originalPriceBDT) : display.region === "pk" ? money(p.originalPricePKR) : money(p.originalPriceUSDT)),
     originalPriceBDT: money(p.originalPriceBDT), originalPricePKR: money(p.originalPricePKR), originalPriceUSDT: money(p.originalPriceUSDT),
     purchaseCostBDT: money(p.purchaseCostBDT), purchaseCostPKR: money(p.purchaseCostPKR), purchaseCostUSDT: money(p.purchaseCostUSDT),
     accountCostBDT: money(p.accountCostBDT), accountCostPKR: money(p.accountCostPKR), accountCostUSDT: money(p.accountCostUSDT),
@@ -370,16 +369,27 @@ function stockToDelivery(s: StockItem): DeliveryPayload {
 export async function getVisitorRegion(): Promise<{ region: PriceRegion; country?: string }> {
   if (isBrowser) {
     const override = getRegionOverride();
-    if (override) {
-      return { region: override === "pk" ? "world" : override, country: override === "bd" ? "BD" : "XX" };
+    if (override) return { region: override, country: override === "bd" ? "BD" : override === "pk" ? "PK" : "XX" };
+    const cached = load<{ region?: PriceRegion; country?: string; ts?: number; version?: number } | null>(STORAGE_KEYS.region, null);
+    if (cached?.region && cached.version === REGION_CACHE_VERSION && cached.ts && Date.now() - cached.ts < 1000 * 60 * 60 * 12) {
+      return { region: cached.region, country: cached.country };
     }
-    window.localStorage.removeItem(STORAGE_KEYS.regionOverride);
   }
-  // BDT is the storefront default on every fresh browser session. Currency is
-  // never inferred from IP, timezone, language or a VPN. A customer can still
-  // switch to USDT manually from the header; that choice is kept for the
-  // current browser session by getRegionOverride().
-  const result = { region: "bd" as PriceRegion, country: "BD", ts: Date.now(), version: REGION_CACHE_VERSION };
+
+  let country = browserCountryHint() || "XX";
+  try {
+    const detected = await detectClientCountry();
+    if (detected) country = detected;
+  } catch {}
+  let region = regionFromCountry(country);
+  try {
+    const data = await http<{ region: PriceRegion; country: string }>(`/region?region=${region}`);
+    if (data?.country && data.country !== "XX") {
+      country = data.country;
+      region = data.region;
+    }
+  } catch {}
+  const result = { region, country, ts: Date.now(), version: REGION_CACHE_VERSION };
   save(STORAGE_KEYS.region, result);
   return result;
 }
@@ -387,10 +397,10 @@ export async function getVisitorRegion(): Promise<{ region: PriceRegion; country
 /** Manually pin the pricing region (from the header switcher). Overrides IP detection. */
 export function setVisitorRegion(region: PriceRegion) {
   if (!isBrowser) return;
-  if (region === "pk") region = "world";
   window.localStorage.removeItem(STORAGE_KEYS.regionOverride);
   window.sessionStorage.setItem(STORAGE_KEYS.regionOverride, JSON.stringify(region));
-  save(STORAGE_KEYS.region, { region, country: region === "bd" ? "BD" : "XX", ts: Date.now(), version: REGION_CACHE_VERSION });
+  const country = region === "bd" ? "BD" : region === "pk" ? "PK" : "XX";
+  save(STORAGE_KEYS.region, { region, country, ts: Date.now(), version: REGION_CACHE_VERSION });
   clearProductsCache();
   window.dispatchEvent(new CustomEvent("price-region-changed", { detail: region }));
 }
@@ -405,7 +415,7 @@ export function getRegionOverride(): PriceRegion | null {
   } catch {
     value = null;
   }
-  return value === "bd" || value === "world" ? value : null;
+  return value === "bd" || value === "pk" || value === "world" ? value : null;
 }
 
 /** Drop the manual pin and clear the cached detection so IP takes over again. */
@@ -444,22 +454,6 @@ export function startGoogleLogin(returnTo = "/account") {
   if (!isBrowser) return;
   const origin = window.location.origin;
   window.location.assign(`${API_BASE_URL}/auth/google/start?returnTo=${encodeURIComponent(returnTo)}&origin=${encodeURIComponent(origin)}`);
-}
-
-export async function requestCustomerEmailCode(email: string): Promise<{ expiresIn: number; message: string }> {
-  return http<{ ok: true; expiresIn: number; message: string }>("/auth/email/start", {
-    method: "POST",
-    body: JSON.stringify({ email: email.trim().toLowerCase() }),
-  });
-}
-
-export async function verifyCustomerEmailCode(email: string, code: string): Promise<CustomerSession> {
-  const data = await http<{ token: string; customer: CustomerSession }>("/auth/email/verify", {
-    method: "POST",
-    body: JSON.stringify({ email: email.trim().toLowerCase(), code: code.trim() }),
-  });
-  saveCustomerSession(data.token, data.customer);
-  return data.customer;
 }
 
 export async function refreshCurrentCustomer(): Promise<CustomerSession | null> {
@@ -780,7 +774,7 @@ export async function fetchCustomerLatestLoginCode(orderId: string): Promise<Log
 
 export async function getPaymentSettings(): Promise<PaymentSettings> { if (IS_MOCK_MODE) return delay(load(STORAGE_KEYS.payment, mockPaymentSettings)); const data = await http<{ methods: BackendPaymentMethod[] }>("/payment-methods"); if (!data.methods.length) return mockPaymentSettings; return paymentToFrontend(data.methods); }
 export async function getAdminPaymentSettings(): Promise<PaymentSettings> { if (IS_MOCK_MODE) return delay(load(STORAGE_KEYS.payment, mockPaymentSettings)); const data = await http<{ methods: BackendPaymentMethod[] }>("/admin/payment-methods"); if (!data.methods.length) return mockPaymentSettings; return paymentToFrontend(data.methods); }
-export async function updatePaymentSettings(s: PaymentSettings): Promise<PaymentSettings> { if (IS_MOCK_MODE) { save(STORAGE_KEYS.payment, s); return delay(s); } const methods: BackendPaymentMethod[] = [ { key: "bangladesh", title: "Bangladesh", instructions: s.bangladesh.instructions, accounts: [{ label: "bKash", value: s.bangladesh.bkash, note: "Send Money" }, { label: "Nagad", value: s.bangladesh.nagad, note: "Send Money" }], isActive: true }, { key: "binance", title: "Worldwide / USDT", instructions: s.binance.instructions, accounts: [{ label: "Binance Pay ID", value: s.binance.payId }, { label: "Wallet Address", value: s.binance.wallet }], isActive: true } ]; await Promise.all(methods.map((m) => http(`/admin/payment-methods/${m.key}`, { method: "PUT", body: JSON.stringify(m) }))); return getAdminPaymentSettings(); }
+export async function updatePaymentSettings(s: PaymentSettings): Promise<PaymentSettings> { if (IS_MOCK_MODE) { save(STORAGE_KEYS.payment, s); return delay(s); } const methods: BackendPaymentMethod[] = [ { key: "bangladesh", title: "Bangladesh", instructions: s.bangladesh.instructions, accounts: [{ label: "bKash", value: s.bangladesh.bkash, note: "Send Money" }, { label: "Nagad", value: s.bangladesh.nagad, note: "Send Money" }], isActive: true }, { key: "pakistan", title: "Pakistan", instructions: s.pakistan.instructions, accounts: [{ label: "Easypaisa", value: s.pakistan.easypaisa }, { label: "JazzCash", value: s.pakistan.jazzcash }, { label: "Bank", value: s.pakistan.bank }], isActive: true }, { key: "binance", title: "Worldwide / USDT", instructions: s.binance.instructions, accounts: [{ label: "Binance Pay ID", value: s.binance.payId }, { label: "Wallet Address", value: s.binance.wallet }], isActive: true } ]; await Promise.all(methods.map((m) => http(`/admin/payment-methods/${m.key}`, { method: "PUT", body: JSON.stringify(m) }))); return getAdminPaymentSettings(); }
 
 export async function adminLogin(email: string, password: string): Promise<boolean> { if (IS_MOCK_MODE) { const ok = email.trim().length > 0 && password.length > 0; if (ok && isBrowser) window.localStorage.setItem(STORAGE_KEYS.admin, "1"); return delay(ok, 400); } try { const res = await http<{ token: string; admin: AdminUser }>("/admin/auth/login", { method: "POST", body: JSON.stringify({ email, password }) }); if (res?.token && isBrowser) { window.localStorage.setItem(STORAGE_KEYS.token, res.token); window.localStorage.setItem(STORAGE_KEYS.admin, "1"); save(STORAGE_KEYS.adminInfo, res.admin); return true; } return false; } catch { return false; } }
 export function getCurrentAdmin(): AdminUser | null { return load<AdminUser | null>(STORAGE_KEYS.adminInfo, null); }

@@ -22,9 +22,7 @@ const siteStructuredData = JSON.stringify({
   "@context": "https://schema.org",
   "@type": "WebSite",
   name: BRAND.name,
-  url: "https://plandaw.com/",
   description: BRAND.description,
-  image: "https://plandaw.com/plandaw-brand-mark.png",
 });
 
 function NotFoundComponent() {
@@ -95,13 +93,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:description", content: BRAND.tagline },
       { property: "og:type", content: "website" },
       { property: "og:site_name", content: BRAND.name },
-      { property: "og:image", content: "https://plandaw.com/plandaw-brand-mark.png" },
+      { property: "og:image", content: "/favicon.png" },
       { name: "twitter:card", content: "summary" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
-      { rel: "icon", type: "image/png", sizes: "640x640", href: "/plandaw-brand-mark.png?v=20260730" },
-      { rel: "apple-touch-icon", href: "/plandaw-brand-mark.png?v=20260730" },
+      { rel: "icon", type: "image/png", href: "/favicon.png" },
+      { rel: "apple-touch-icon", href: "/apple-touch-icon.png" },
       { rel: "manifest", href: "/site.webmanifest" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },

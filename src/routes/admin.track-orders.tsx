@@ -19,7 +19,7 @@ function mergeOrders(adminOrders: Order[], publicOrders: Order[]) {
 }
 
 function AdminTrackOrders() {
-  const [bootSearch] = useState(() => (typeof window !== "undefined" ? window.sessionStorage.getItem("plandaw_admin_search_query") || "" : ""));
+  const [bootSearch] = useState(() => (typeof window !== "undefined" ? window.sessionStorage.getItem("aimarket_admin_search_query") || "" : ""));
   const [q, setQ] = useState(bootSearch);
   const [status, setStatus] = useState<Order["status"] | "all">("all");
   const [searched, setSearched] = useState(false);
@@ -54,7 +54,7 @@ function AdminTrackOrders() {
 
   useEffect(() => {
     if (!bootSearch) return;
-    window.sessionStorage.removeItem("plandaw_admin_search_query");
+    window.sessionStorage.removeItem("aimarket_admin_search_query");
     void run();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
