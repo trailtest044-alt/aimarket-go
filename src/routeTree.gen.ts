@@ -32,6 +32,7 @@ import { Route as OrderStatusOrderIdRouteImport } from './routes/order-status.$o
 import { Route as ProductsIdRouteImport } from './routes/products.$id'
 import { Route as AdminCustomersCustomerKeyRouteImport } from './routes/admin.customers.$customerKey'
 import { Route as AdminCustomersSearchRouteImport } from './routes/admin.customers.search'
+import { Route as AdminOrdersIndexRouteImport } from './routes/admin.orders.index'
 import { Route as AdminOrdersApprovedRouteImport } from './routes/admin.orders.approved'
 import { Route as AdminOrdersCancelRouteImport } from './routes/admin.orders.cancel'
 import { Route as AdminOrdersDeliveredRouteImport } from './routes/admin.orders.delivered'
@@ -156,6 +157,11 @@ const AdminCustomersSearchRoute = AdminCustomersSearchRouteImport.update({
   path: '/search',
   getParentRoute: () => AdminCustomersRoute,
 } as any)
+const AdminOrdersIndexRoute = AdminOrdersIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminOrdersRoute,
+} as any)
 const AdminOrdersApprovedRoute = AdminOrdersApprovedRouteImport.update({
   id: '/approved',
   path: '/approved',
@@ -223,6 +229,7 @@ export interface FileRoutesByFullPath {
   '/admin/orders/rejected': typeof AdminOrdersRejectedRoute
   '/admin/resellers/$id': typeof AdminResellersIdRoute
   '/auth/google/callback': typeof AuthGoogleCallbackRoute
+  '/admin/orders/': typeof AdminOrdersIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -233,7 +240,6 @@ export interface FileRoutesByTo {
   '/admin/customers': typeof AdminCustomersRouteWithChildren
   '/admin/login': typeof AdminLoginRoute
   '/admin/mail-txt': typeof AdminMailTxtRoute
-  '/admin/orders': typeof AdminOrdersRouteWithChildren
   '/admin/payment-settings': typeof AdminPaymentSettingsRoute
   '/admin/products': typeof AdminProductsRoute
   '/admin/promo-codes': typeof AdminPromoCodesRoute
@@ -254,6 +260,7 @@ export interface FileRoutesByTo {
   '/admin/orders/rejected': typeof AdminOrdersRejectedRoute
   '/admin/resellers/$id': typeof AdminResellersIdRoute
   '/auth/google/callback': typeof AuthGoogleCallbackRoute
+  '/admin/orders': typeof AdminOrdersIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -287,6 +294,7 @@ export interface FileRoutesById {
   '/admin/orders/rejected': typeof AdminOrdersRejectedRoute
   '/admin/resellers/$id': typeof AdminResellersIdRoute
   '/auth/google/callback': typeof AuthGoogleCallbackRoute
+  '/admin/orders/': typeof AdminOrdersIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -321,6 +329,7 @@ export interface FileRouteTypes {
     | '/admin/orders/rejected'
     | '/admin/resellers/$id'
     | '/auth/google/callback'
+    | '/admin/orders/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -331,7 +340,6 @@ export interface FileRouteTypes {
     | '/admin/customers'
     | '/admin/login'
     | '/admin/mail-txt'
-    | '/admin/orders'
     | '/admin/payment-settings'
     | '/admin/products'
     | '/admin/promo-codes'
@@ -352,6 +360,7 @@ export interface FileRouteTypes {
     | '/admin/orders/rejected'
     | '/admin/resellers/$id'
     | '/auth/google/callback'
+    | '/admin/orders'
   id:
     | '__root__'
     | '/'
@@ -384,6 +393,7 @@ export interface FileRouteTypes {
     | '/admin/orders/rejected'
     | '/admin/resellers/$id'
     | '/auth/google/callback'
+    | '/admin/orders/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -561,6 +571,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminCustomersSearchRouteImport
       parentRoute: typeof AdminCustomersRoute
     }
+    '/admin/orders/': {
+      id: '/admin/orders/'
+      path: '/'
+      fullPath: '/admin/orders/'
+      preLoaderRoute: typeof AdminOrdersIndexRouteImport
+      parentRoute: typeof AdminOrdersRoute
+    }
     '/admin/orders/approved': {
       id: '/admin/orders/approved'
       path: '/approved'
@@ -633,6 +650,7 @@ interface AdminOrdersRouteChildren {
   AdminOrdersDeliveredRoute: typeof AdminOrdersDeliveredRoute
   AdminOrdersPendingRoute: typeof AdminOrdersPendingRoute
   AdminOrdersRejectedRoute: typeof AdminOrdersRejectedRoute
+  AdminOrdersIndexRoute: typeof AdminOrdersIndexRoute
 }
 
 const AdminOrdersRouteChildren: AdminOrdersRouteChildren = {
@@ -641,6 +659,7 @@ const AdminOrdersRouteChildren: AdminOrdersRouteChildren = {
   AdminOrdersDeliveredRoute: AdminOrdersDeliveredRoute,
   AdminOrdersPendingRoute: AdminOrdersPendingRoute,
   AdminOrdersRejectedRoute: AdminOrdersRejectedRoute,
+  AdminOrdersIndexRoute: AdminOrdersIndexRoute,
 }
 
 const AdminOrdersRouteWithChildren = AdminOrdersRoute._addFileChildren(

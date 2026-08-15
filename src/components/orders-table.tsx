@@ -7,11 +7,11 @@ import { toast } from "sonner";
 import { Check, X, Truck, Inbox, Eye, EyeOff, ShieldCheck, Loader2, LockKeyhole, PlusCircle } from "lucide-react";
 import { ProductLogo } from "@/components/product-logo";
 
-export function OrdersTable({ status }: { status: Order["status"] }) {
+export function OrdersTable({ status }: { status?: Order["status"] }) {
   const qc = useQueryClient();
   const adminReady = useAdminAuthReady();
   const { data: orders = [], isLoading } = useQuery({ queryKey: ["orders"], queryFn: getOrders, enabled: adminReady });
-  const list = orders.filter((o) => o.status === status);
+  const list = status ? orders.filter((o) => o.status === status) : orders;
   const [manual, setManual] = useState<{ order: Order; state: ManualActivationState } | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [manualBusy, setManualBusy] = useState(false);
@@ -72,7 +72,7 @@ export function OrdersTable({ status }: { status: Order["status"] }) {
     return (
       <div className="glass rounded-2xl py-16 text-center">
         <Inbox className="mx-auto h-10 w-10 text-muted-foreground" />
-        <h3 className="mt-3 text-base font-semibold">No {status} orders</h3>
+        <h3 className="mt-3 text-base font-semibold">{status ? `No ${status} orders` : "No orders found"}</h3>
         <p className="mt-1 text-sm text-muted-foreground">Orders will show up here once available.</p>
       </div>
     );
@@ -123,7 +123,7 @@ export function OrdersTable({ status }: { status: Order["status"] }) {
               <td className="font-semibold">{formatMoney(o.amount, o.currency)}</td>
               <td className="px-4 py-3">
                 <div className="flex flex-wrap justify-end gap-1">
-                  {status === "pending" && (
+                  {o.status === "pending" && (
                     <>
                       {o.isBackorder && <span className={`inline-flex items-center rounded-lg px-2 py-1 text-[11px] font-bold ${o.deliveryDetailsAdded ? "bg-primary/10 text-primary" : "bg-warning/15 text-warning"}`}>{o.deliveryDetailsAdded ? "Details ready" : "Backorder"}</span>}
                       {o.isBackorder && !o.deliveryDetailsAdded && <button onClick={() => openDetails(o)} className="inline-flex items-center gap-1 rounded-lg border border-primary/25 bg-primary/8 px-2.5 py-1 text-xs font-semibold text-primary hover:bg-primary/15"><PlusCircle className="h-3 w-3" /> Add details</button>}
@@ -139,18 +139,19 @@ export function OrdersTable({ status }: { status: Order["status"] }) {
                       </button>
                     </>
                   )}
-                  {status === "approved" && (
+                  {o.status === "approved" && (
                     <>
                       <span className="text-xs text-muted-foreground">Delivery unlocked {o.approvedByNickname ? `by ${o.approvedByNickname}` : ""}</span>
                       <button onClick={() => setStatus(o.id, "delivered")} className="inline-flex items-center gap-1 rounded-lg bg-gradient-primary px-2.5 py-1 text-xs font-semibold text-primary-foreground shadow-glow"><Truck className="h-3 w-3" /> Mark Delivered</button>
                     </>
                   )}
-                  {status === "rejected" && (
+                  {o.status === "rejected" && (
                     <button onClick={() => setStatus(o.id, "pending")} className="rounded-lg bg-secondary px-2.5 py-1 text-xs font-semibold hover:bg-secondary/80">
                       Restore
                     </button>
                   )}
-                  {status === "delivered" && <span className="text-xs text-muted-foreground">Completed {o.deliveredByNickname ? `by ${o.deliveredByNickname}` : ""}</span>}
+                  {o.status === "delivered" && <span className="text-xs text-muted-foreground">Completed {o.deliveredByNickname ? `by ${o.deliveredByNickname}` : ""}</span>}
+                  {o.status === "cancelled" && <span className="text-xs text-muted-foreground">Cancelled {o.cancelledByNickname ? `by ${o.cancelledByNickname}` : ""}</span>}
                 </div>
               </td>
             </tr>

@@ -46,7 +46,7 @@ import type { AttentionItem, CurrencyCode, DashboardChartRow, MoneyBag, ProductP
 
 export const Route = createFileRoute("/admin/")({ component: AdminDashboard });
 
-const currencies: CurrencyCode[] = ["BDT", "PKR", "USDT"];
+const currencies: CurrencyCode[] = ["PKR", "BDT", "USDT"];
 const DASHBOARD_LIVE_REFRESH_MS = 5_000;
 
 function dhakaDateInputValue(date: Date) {
@@ -68,7 +68,7 @@ function AdminDashboard() {
   const [mode, setMode] = useState<DashboardPeriodMode>("weekly");
   const [start, setStart] = useState(weekStart);
   const [end, setEnd] = useState(today);
-  const [currency, setCurrency] = useState<CurrencyCode>("BDT");
+  const [currency, setCurrency] = useState<CurrencyCode>("PKR");
 
   const query = useMemo(() => ({ mode, start, end, compare: true }), [mode, start, end]);
   const { data, isLoading, isFetching, refetch, error } = useQuery({

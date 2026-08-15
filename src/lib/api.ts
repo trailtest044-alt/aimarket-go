@@ -330,14 +330,23 @@ function paymentToFrontend(methods: BackendPaymentMethod[]): PaymentSettings {
   };
 }
 function parsePaymentNote(note?: string) { const text = note || ""; const channel = text.match(/Channel:\s*([^;]+)/i)?.[1]?.trim() || "Manual"; const ref = text.match(/Reference:\s*([^;]+)/i)?.[1]?.trim() || undefined; return { channel, ref }; }
+function normalizeOrderStatus(value: unknown): Order["status"] {
+  const status = String(value || "pending").trim().toLowerCase();
+  if (["delivered", "completed", "complete", "fulfilled"].includes(status)) return "delivered";
+  if (["approved", "paid", "confirmed", "processing"].includes(status)) return "approved";
+  if (["rejected", "declined", "failed"].includes(status)) return "rejected";
+  if (["cancelled", "canceled"].includes(status)) return "cancelled";
+  return "pending";
+}
 function orderToFrontend(o: BackendOrder): Order {
-  const note = parsePaymentNote(o.paymentNote); const snap = o.productSnapshot || o.product; const productId = typeof o.productId === "object" ? (o.productId.slug || o.productId._id || "") : (o.productId || "");
+  const legacy = o as BackendOrder & Record<string, any>;
+  const note = parsePaymentNote(o.paymentNote); const snap = o.productSnapshot || o.product || legacy.productDetails; const productId = typeof o.productId === "object" ? (o.productId.slug || o.productId._id || "") : (o.productId || legacy.productSlug || "");
   return {
-    id: o.orderId, productId, productName: snap?.title || (typeof o.productId === "object" ? o.productId.title : "") || "Product", productLogoUrl: snap?.logoUrl || "", productIcon: snap?.icon || "✨", batchId: o.batchId || "",
-    customerName: o.customer?.name || "", customerEmail: o.customer?.email || "", contact: o.customer?.whatsapp || "",
-    amount: money(snap?.price), currency: snap?.currency, priceRegion: o.priceRegion || snap?.priceRegion,
-    paymentMethod: o.paymentMethod, paymentChannel: note.channel, transactionId: o.transactionId || "", customerOrderRef: o.customerOrderRef || note.ref,
-    status: o.status, createdAt: o.createdAt || new Date().toISOString(), approvedByNickname: o.approvedByNickname || "", deliveredByNickname: o.deliveredByNickname || "", rejectedByNickname: o.rejectedByNickname || "", cancelledByNickname: o.cancelledByNickname || "", cancelledAt: o.cancelledAt || "", cancelReason: o.cancelReason || "", reviewedByNickname: o.reviewedByNickname || "", deliveryMode: snap?.deliveryMode, deliveryVideoUrl: snap?.deliveryVideoUrl || "", manualInputMode: snap?.manualInputMode || "ideogram_credentials", manualActivationRequired: snap?.deliveryMode === "manual" || Boolean(o.manualActivationRequired), manualActivationSubmitted: Boolean((o as any).manualActivationSubmittedAt || o.manualActivationSubmitted), manualActivationActivated: Boolean((o as any).manualActivationActivatedAt || o.manualActivationActivated), isBackorder: Boolean(o.fulfillment?.isBackorder || (snap as any)?.backorder), deliveryDetailsAdded: Boolean(o.fulfillment?.deliveryDetailsAddedAt),
+    id: o.orderId || legacy.id || legacy._id || "", productId, productName: snap?.title || legacy.productName || (typeof o.productId === "object" ? o.productId.title : "") || "Product", productLogoUrl: snap?.logoUrl || legacy.productLogoUrl || "", productIcon: snap?.icon || legacy.productIcon || "✨", batchId: o.batchId || legacy.batch || "",
+    customerName: o.customer?.name || legacy.customerName || "", customerEmail: o.customer?.email || legacy.customerEmail || legacy.email || "", contact: o.customer?.whatsapp || legacy.contact || legacy.whatsapp || "",
+    amount: money(snap?.price ?? legacy.amount ?? legacy.price), currency: (snap?.currency || legacy.currency || "USDT") as CurrencyCode, priceRegion: o.priceRegion || snap?.priceRegion || legacy.region,
+    paymentMethod: (o.paymentMethod || legacy.method || "binance") as Order["paymentMethod"], paymentChannel: note.channel || legacy.paymentChannel || "Manual", transactionId: o.transactionId || legacy.txid || legacy.transactionID || "", customerOrderRef: o.customerOrderRef || legacy.reference || note.ref,
+    status: normalizeOrderStatus(o.status), createdAt: o.createdAt || legacy.date || new Date().toISOString(), approvedByNickname: o.approvedByNickname || "", deliveredByNickname: o.deliveredByNickname || "", rejectedByNickname: o.rejectedByNickname || "", cancelledByNickname: o.cancelledByNickname || "", cancelledAt: o.cancelledAt || "", cancelReason: o.cancelReason || "", reviewedByNickname: o.reviewedByNickname || "", deliveryMode: snap?.deliveryMode, deliveryVideoUrl: snap?.deliveryVideoUrl || "", manualInputMode: snap?.manualInputMode || "ideogram_credentials", manualActivationRequired: snap?.deliveryMode === "manual" || Boolean(o.manualActivationRequired), manualActivationSubmitted: Boolean((o as any).manualActivationSubmittedAt || o.manualActivationSubmitted), manualActivationActivated: Boolean((o as any).manualActivationActivatedAt || o.manualActivationActivated), isBackorder: Boolean(o.fulfillment?.isBackorder || (snap as any)?.backorder), deliveryDetailsAdded: Boolean(o.fulfillment?.deliveryDetailsAddedAt),
   };
 }
 function stockToFrontend(s: BackendStock): StockItem { const productId = typeof s.productId === "object" ? (s.productId.slug || s.productId._id || "") : (s.productId || ""); return { id: s._id, productId, deliveryMode: s.payload?.deliveryMode || "credentials", email: s.payload?.email || "Encrypted", password: s.payload?.password ? "********" : "Encrypted", activationCode: s.payload?.activationCode ? "********" : undefined, instructions: s.payload?.instruction || s.adminNote || "Encrypted delivery item", videoUrl: s.payload?.videoUrl, imageUrl: s.payload?.imageUrl, getCodeAccessDays: Number(s.payload?.getCodeAccessDays || 25), status: s.status === "available" ? "available" : "delivered", createdAt: s.createdAt || new Date().toISOString(), addedBy: s.createdByNickname || "" }; }
