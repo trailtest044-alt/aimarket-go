@@ -1,9 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
-import { Search, ClipboardList, Loader2, Copy, CheckCircle2, Clock, Truck, XCircle, Eye, EyeOff, ShieldCheck, Image as ImageIcon, PlayCircle, FileText } from "lucide-react";
+import { Search, ClipboardList, Loader2, Copy, CheckCircle2, Clock, Truck, XCircle, Ban, Eye, EyeOff, ShieldCheck, Image as ImageIcon, PlayCircle, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { SiteHeader, SiteFooter } from "@/components/site-header";
 import { SupportPopups, SupportHelpSection } from "@/components/support-popups";
+import { CustomerDeliveryCard } from "@/components/customer-delivery-card";
 import { trackOrdersByCode, formatMoney, type TrackOrderResult, type DeliveryPayload } from "@/lib/api";
 import type { Order } from "@/lib/mock-data";
 
@@ -135,10 +136,16 @@ function TrackedOrder({ result }: { result: TrackOrderResult }) {
           Waiting for admin approval. Track again using the same Transaction ID or Order ID.
         </div>
       )}
-      {(order.status === "approved" || order.status === "delivered") && <DeliveryCard delivery={delivery} />}
+      {(order.status === "approved" || order.status === "delivered") && <CustomerDeliveryCard orderId={order.id} delivery={delivery} />}
       {order.status === "rejected" && (
         <div className="mt-5 rounded-2xl border border-destructive/25 bg-destructive/10 p-4 text-sm text-destructive">
           Order rejected. Please contact support.
+        </div>
+      )}
+      {order.status === "cancelled" && (
+        <div className="mt-5 rounded-2xl border border-destructive/25 bg-destructive/10 p-4 text-sm text-destructive">
+          <div className="font-bold">Order cancelled. Delivery access has been removed.</div>
+          {order.cancelReason && <div className="mt-1">Reason: {order.cancelReason}</div>}
         </div>
       )}
     </div>
@@ -265,6 +272,8 @@ function statusMeta(status: Order["status"]) {
       return { Icon: Truck, label: "Delivered", badge: "border-success/30 bg-success/10 text-success" };
     case "rejected":
       return { Icon: XCircle, label: "Rejected", badge: "border-destructive/30 bg-destructive/10 text-destructive" };
+    case "cancelled":
+      return { Icon: Ban, label: "Cancelled", badge: "border-destructive/30 bg-destructive/10 text-destructive" };
     default:
       return { Icon: Clock, label: "Pending", badge: "border-warning/30 bg-warning/10 text-warning" };
   }

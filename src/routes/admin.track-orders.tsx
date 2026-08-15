@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { RefreshCcw, Search, ClipboardList, Inbox, AlertCircle } from "lucide-react";
 import { AdminShell } from "@/components/admin-shell";
@@ -19,7 +19,8 @@ function mergeOrders(adminOrders: Order[], publicOrders: Order[]) {
 }
 
 function AdminTrackOrders() {
-  const [q, setQ] = useState("");
+  const [bootSearch] = useState(() => (typeof window !== "undefined" ? window.sessionStorage.getItem("plandaw_admin_search_query") || "" : ""));
+  const [q, setQ] = useState(bootSearch);
   const [status, setStatus] = useState<Order["status"] | "all">("all");
   const [searched, setSearched] = useState(false);
   const query = q.trim();
@@ -50,6 +51,13 @@ function AdminTrackOrders() {
     setSearched(true);
     await Promise.allSettled([adminSearch.refetch(), publicCodeSearch.refetch()]);
   }
+
+  useEffect(() => {
+    if (!bootSearch) return;
+    window.sessionStorage.removeItem("plandaw_admin_search_query");
+    void run();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function statusClass(value: Order["status"]) {
     if (value === "delivered") return "bg-emerald-100 text-emerald-700 ring-emerald-200";

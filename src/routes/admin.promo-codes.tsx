@@ -3,7 +3,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 import { AdminShell } from "@/components/admin-shell";
-import { getPromoCodes, createPromoCode, updatePromoCode, setPromoCodeStatus, deletePromoCode, getProducts, type PromoInput } from "@/lib/api";
+import { getPromoCodes, createPromoCode, updatePromoCode, setPromoCodeStatus, deletePromoCode, getAdminProducts, type PromoInput } from "@/lib/api";
+import { useAdminAuthReady } from "@/hooks/use-admin-auth-ready";
 import type { PromoCode } from "@/lib/mock-data";
 import { BadgePercent, Pencil, Plus, Power, Trash2, X } from "lucide-react";
 
@@ -16,18 +17,21 @@ const emptyForm: PromoInput = {
   code: "", description: "", discountType: "percent", percentOff: 10,
   fixedBDT: 0, fixedPKR: 0, fixedUSDT: 0,
   maxUses: 0, minAmountBDT: 0, minAmountPKR: 0, minAmountUSDT: 0,
-  productIds: [], startsAt: null, expiresAt: null, isActive: true,
+  productIds: [], startsAt: null, expiresAt: null, isActive: true, showOnHomepage: false, allowResellers: false,
 };
 
 function PromoCodesPage() {
   const qc = useQueryClient();
-  const { data: promos = [], isLoading } = useQuery({ queryKey: ["promos"], queryFn: getPromoCodes });
-  const { data: products = [] } = useQuery({ queryKey: ["products"], queryFn: getProducts });
+  const adminReady = useAdminAuthReady();
+  const { data: promos = [], isLoading } = useQuery({ queryKey: ["promos"], queryFn: getPromoCodes, enabled: adminReady, staleTime: 0, refetchOnWindowFocus: true, refetchOnMount: "always" });
+  const { data: products = [] } = useQuery({ queryKey: ["admin-products"], queryFn: getAdminProducts, enabled: adminReady, staleTime: 0, refetchOnWindowFocus: true, refetchOnMount: "always" });
   const [editing, setEditing] = useState<PromoCode | null>(null);
   const [form, setForm] = useState<PromoInput | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const refresh = () => qc.invalidateQueries({ queryKey: ["promos"] });
+  const refresh = async () => {
+    await qc.invalidateQueries({ queryKey: ["promos"] });
+  };
   const openNew = () => { setEditing(null); setForm({ ...emptyForm }); };
   const openEdit = (p: PromoCode) => { setEditing(p); const { id, usedCount, createdByNickname, createdAt, ...rest } = p; setForm(rest); };
 
@@ -39,18 +43,18 @@ function PromoCodesPage() {
     try {
       if (editing) { await updatePromoCode(editing.id, form); toast.success(`Updated ${form.code.toUpperCase()}`); }
       else { await createPromoCode(form); toast.success(`Created ${form.code.toUpperCase()}`); }
-      setForm(null); setEditing(null); refresh();
+      setForm(null); setEditing(null); await refresh();
     } catch (err) { toast.error(err instanceof Error ? err.message : "Could not save promo code."); }
     finally { setBusy(false); }
   }
 
   async function toggle(p: PromoCode) {
-    try { await setPromoCodeStatus(p.id, !p.isActive); toast.success(`${p.code} is now ${!p.isActive ? "active" : "off"}`); refresh(); }
+    try { await setPromoCodeStatus(p.id, !p.isActive); toast.success(`${p.code} is now ${!p.isActive ? "active" : "off"}`); await refresh(); }
     catch (err) { toast.error(err instanceof Error ? err.message : "Failed"); }
   }
   async function remove(p: PromoCode) {
     if (!window.confirm(`Delete promo code ${p.code}? This cannot be undone.`)) return;
-    try { await deletePromoCode(p.id); toast.success(`Deleted ${p.code}`); refresh(); }
+    try { await deletePromoCode(p.id); toast.success(`Deleted ${p.code}`); await refresh(); }
     catch (err) { toast.error(err instanceof Error ? err.message : "Failed"); }
   }
 
@@ -83,12 +87,13 @@ function PromoCodesPage() {
                 <div className="text-xs text-muted-foreground">{p.description || "—"}</div>
               </div>
               <div className="text-sm font-semibold text-gold">
-                {p.discountType === "percent" ? `${p.percentOff}% off` : `৳${p.fixedBDT} / ₨${p.fixedPKR} / $${p.fixedUSDT} off`}
+                {p.discountType === "percent" ? `${p.percentOff}% off` : `৳${p.fixedBDT} / ${p.fixedUSDT} USDT off`}
               </div>
               <div className="text-xs text-muted-foreground">
                 Used {p.usedCount}{p.maxUses > 0 ? ` / ${p.maxUses}` : " · unlimited"}
                 {p.expiresAt ? ` · expires ${new Date(p.expiresAt).toLocaleDateString()}` : ""}
                 {p.productIds.length > 0 ? ` · ${p.productIds.length} product(s)` : " · all products"}
+                {p.allowResellers === true ? " · customers + resellers" : " · customers only"}
               </div>
               <div className="ml-auto flex items-center gap-1.5">
                 <button onClick={() => toggle(p)} title={p.isActive ? "Turn off" : "Turn on"} className={`btn-ghost rounded-lg p-2 ${p.isActive ? "text-success" : "text-muted-foreground"}`}><Power className="h-4 w-4" /></button>
@@ -128,13 +133,11 @@ function PromoCodesPage() {
               ) : (
                 <>
                   <NumF label="BDT off (৳)" value={form.fixedBDT} onChange={(v) => setForm({ ...form, fixedBDT: v })} />
-                  <NumF label="PKR off (₨)" value={form.fixedPKR} onChange={(v) => setForm({ ...form, fixedPKR: v })} />
                   <NumF label="USDT off ($)" value={form.fixedUSDT} onChange={(v) => setForm({ ...form, fixedUSDT: v })} />
                 </>
               )}
               <NumF label="Max uses (0 = unlimited)" value={form.maxUses} onChange={(v) => setForm({ ...form, maxUses: Math.round(v) })} />
               <NumF label="Min order BDT (0 = none)" value={form.minAmountBDT} onChange={(v) => setForm({ ...form, minAmountBDT: v })} />
-              <NumF label="Min order PKR (0 = none)" value={form.minAmountPKR} onChange={(v) => setForm({ ...form, minAmountPKR: v })} />
               <NumF label="Min order USDT (0 = none)" value={form.minAmountUSDT} onChange={(v) => setForm({ ...form, minAmountUSDT: v })} />
 
               <label className="block">
@@ -165,6 +168,17 @@ function PromoCodesPage() {
               <label className="flex items-center gap-2 sm:col-span-2">
                 <input type="checkbox" checked={form.isActive} onChange={(e) => setForm({ ...form, isActive: e.target.checked })} className="h-4 w-4 accent-[var(--primary)]" />
                 <span className="text-sm font-semibold">Active (customers can use it right now)</span>
+              </label>
+              <label className="flex items-center gap-2 sm:col-span-2">
+                <input type="checkbox" checked={Boolean(form.showOnHomepage)} onChange={(e) => setForm({ ...form, showOnHomepage: e.target.checked })} className="h-4 w-4 accent-[var(--primary)]" />
+                <span className="text-sm font-semibold">Show on homepage promo banner</span>
+              </label>
+              <label className="flex items-start gap-2 rounded-xl border border-border bg-secondary/20 p-3 sm:col-span-2">
+                <input type="checkbox" checked={Boolean(form.allowResellers)} onChange={(e) => setForm({ ...form, allowResellers: e.target.checked })} className="mt-0.5 h-4 w-4 accent-[var(--primary)]" />
+                <span>
+                  <span className="block text-sm font-semibold">Allow reseller accounts to use this code</span>
+                  <span className="mt-0.5 block text-xs text-muted-foreground">When off, resellers will not see this offer on the homepage and the server will reject the code even if they know it.</span>
+                </span>
               </label>
             </div>
 

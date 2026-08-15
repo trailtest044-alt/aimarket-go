@@ -10,6 +10,10 @@ export function ProductDetailsView({ productId }: { productId: string }) {
     queryKey: ["product", productId],
     queryFn: () => getProductById(productId),
     enabled: Boolean(productId),
+    staleTime: 60_000,
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: true,
   });
 
   if (isLoading) {
@@ -48,10 +52,8 @@ export function ProductDetailsView({ productId }: { productId: string }) {
         {/* Left: hero card */}
         <div className="animate-rise">
           <div className="glass relative overflow-hidden rounded-3xl p-8 text-center lg:sticky lg:top-24">
-            <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-[radial-gradient(circle_at_50%_-30%,oklch(0.62_0.22_288/0.35),transparent_70%)]" />
             <div className="relative">
               <div className="relative mx-auto w-fit">
-                <div className="absolute -inset-4 rounded-[2.4rem] bg-gradient-primary opacity-25 blur-2xl animate-glow-pulse" />
                 <ProductLogo
                   logoUrl={product.logoUrl}
                   icon={product.icon}
@@ -72,8 +74,8 @@ export function ProductDetailsView({ productId }: { productId: string }) {
               <div className="mt-6 rounded-2xl border border-border bg-white/4 p-5 text-left">
                 <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">Price</div>
                 <div className="mt-1 flex items-baseline gap-3">
-                  <span className="font-display text-3xl font-bold text-gold-gradient sm:text-4xl">{formatMoney(product.price, product.currency)}</span>
-                  {product.originalPrice ? (
+                  <span className="font-display text-3xl font-bold text-gold-gradient sm:text-4xl">{product.isFree ? "Free" : formatMoney(product.price, product.currency)}</span>
+                  {!product.isFree && product.originalPrice ? (
                     <span className="text-base text-muted-foreground/70 line-through">{formatMoney(product.originalPrice, product.currency)}</span>
                   ) : null}
                 </div>

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { z } from "zod";
 import { SiteHeader, SiteFooter } from "@/components/site-header";
 import { SupportPopups, SupportHelpSection } from "@/components/support-popups";
+import { CustomerDeliveryCard } from "@/components/customer-delivery-card";
 import {
   CheckCircle2,
   Home,
@@ -18,17 +19,25 @@ import {
   Truck,
   PlayCircle,
   Image as ImageIcon,
+  X,
 } from "lucide-react";
-import { formatMoney, trackOrdersByCode, type DeliveryPayload } from "@/lib/api";
+import {
+  formatMoney,
+  trackOrdersByCode,
+  type DeliveryPayload,
+} from "@/lib/api";
 import type { Order } from "@/lib/mock-data";
 import { toast } from "sonner";
+import { ManualActivationCard } from "@/components/manual-activation-card";
 
 const search = z.object({
   orderId: z.string().optional(),
   productName: z.string().optional(),
-  amount: z.number().optional(),
+  amount: z.coerce.number().optional(),
   currency: z.string().optional(),
-  method: z.enum(["bangladesh", "pakistan", "binance"]).optional(),
+  method: z
+    .enum(["bangladesh", "pakistan", "binance", "reseller_due", "free"])
+    .optional(),
   channel: z.string().optional(),
   transactionId: z.string().optional(),
   customerOrderRef: z.string().optional(),
@@ -41,71 +50,103 @@ export const Route = createFileRoute("/order-pending")({
 
 function OrderPendingPage() {
   const params = Route.useSearch();
-  const pollCode = params.transactionId || params.customerOrderRef || params.orderId || "";
+  const pollCode =
+    params.transactionId || params.customerOrderRef || params.orderId || "";
 
-  const { data: liveResults, isFetching } = useQuery({
+  const { data: liveResults, isFetching, refetch } = useQuery({
     queryKey: ["pending-order-live", pollCode],
     queryFn: () => trackOrdersByCode(pollCode),
     enabled: Boolean(pollCode),
     refetchInterval: (query) => {
       const first = query.state.data?.[0];
-      if (first?.order?.status === "approved" || first?.order?.status === "delivered") return false;
-      return 4000;
+      if (
+        first?.order?.status === "approved" ||
+        first?.order?.status === "delivered"
+      )
+        return false;
+      // Keep the pending page live without making customers wait several
+      // seconds after the admin has approved an order.
+      return 1500;
     },
     refetchOnWindowFocus: true,
     staleTime: 0,
   });
 
-  const live = liveResults?.find((item) => {
-    const o = item.order;
-    return (
-      (params.orderId && o.id === params.orderId) ||
-      (params.transactionId && o.transactionId === params.transactionId) ||
-      (params.customerOrderRef && o.customerOrderRef === params.customerOrderRef)
-    );
-  }) || liveResults?.[0];
+  const live =
+    liveResults?.find((item) => {
+      const o = item.order;
+      return (
+        (params.orderId && o.id === params.orderId) ||
+        (params.transactionId && o.transactionId === params.transactionId) ||
+        (params.customerOrderRef &&
+          o.customerOrderRef === params.customerOrderRef)
+      );
+    }) || liveResults?.[0];
 
   const liveOrder = live?.order;
   const delivery = live?.delivery ?? null;
   const status = liveOrder?.status || "pending";
   const isDelivered = status === "approved" || status === "delivered";
+  const isRejected = status === "rejected";
 
   return (
     <div className="min-h-screen">
       <SiteHeader />
       <SupportPopups />
       <main className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
-        <section className={`glass relative overflow-hidden rounded-3xl p-7 sm:p-9 animate-rise-lg ${isDelivered ? "border-success/30" : "border-warning/25"}`}>
-          <div className={`absolute inset-x-0 top-0 h-1 ${isDelivered ? "bg-gradient-to-r from-success/0 via-success to-success/0" : "bg-gradient-primary"}`} />
+        <section
+          className={`glass relative overflow-hidden rounded-3xl p-7 sm:p-9 animate-rise-lg ${isRejected ? "border-destructive/40 bg-destructive/5" : isDelivered ? "border-success/30" : "border-warning/25"}`}
+        >
+          <div
+            className={`absolute inset-x-0 top-0 h-1 ${isRejected ? "bg-destructive" : isDelivered ? "bg-gradient-to-r from-success/0 via-success to-success/0" : "bg-gradient-primary"}`}
+          />
 
           <div className="grid gap-8 lg:grid-cols-[1fr_280px]">
             <div>
-              <div className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-xs font-bold ${isDelivered ? "border-success/30 bg-success/10 text-success" : "border-warning/30 bg-warning/10 text-warning"}`}>
-                {isDelivered ? <Truck className="h-3.5 w-3.5" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
-                {isDelivered ? "Delivery ready" : "Order received"}
+              <div
+                className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-xs font-bold ${isRejected ? "border-destructive/30 bg-destructive/10 text-destructive" : isDelivered ? "border-success/30 bg-success/10 text-success" : "border-warning/30 bg-warning/10 text-warning"}`}
+              >
+                {isRejected ? <X className="h-3.5 w-3.5" /> : isDelivered ? (
+                  <Truck className="h-3.5 w-3.5" />
+                ) : (
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                )}
+                {isRejected ? "Order rejected" : isDelivered ? "Delivery ready" : "Order received"}
               </div>
 
               <h1 className="mt-4 font-display text-3xl font-bold sm:text-4xl">
-                {isDelivered ? (
-                  <>Your delivery is <span className="text-gradient">ready</span></>
+                {isRejected ? <>Order <span className="text-destructive">rejected</span></> : isDelivered ? (
+                  <>
+                    Your delivery is{" "}
+                    <span className="text-gradient">ready</span>
+                  </>
                 ) : (
-                  <>Order <span className="text-gradient">submitted</span></>
+                  <>
+                    Order <span className="text-gradient">submitted</span>
+                  </>
                 )}
               </h1>
               <p className="mt-3 max-w-xl text-sm leading-6 text-muted-foreground sm:text-base">
-                {isDelivered
+                {isRejected ? "This order was rejected. No delivery will be made for this order; please contact support if you need help." : isDelivered
                   ? "Your payment has been approved. Your account and instruction details are shown below on this same page."
                   : "Your payment is now in review. This page checks your order automatically and delivery will unlock here the moment admin approval completes."}
               </p>
 
-              {!isDelivered && (
+              {!isDelivered && !isRejected && (
                 <div className="mt-7 rounded-3xl border border-warning/25 bg-white/4 p-5">
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <h2 className="text-sm font-bold text-foreground">Admin review in progress</h2>
-                      <p className="mt-1 text-xs text-muted-foreground">No refresh needed — keep this page open, delivery unlocks automatically.</p>
+                      <h2 className="text-sm font-bold text-foreground">
+                        Admin review in progress
+                      </h2>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        No refresh needed — keep this page open, delivery
+                        unlocks automatically.
+                      </p>
                     </div>
-                    {isFetching && <Loader2 className="h-5 w-5 animate-spin text-warning" />}
+                    {isFetching && (
+                      <Loader2 className="h-5 w-5 animate-spin text-warning" />
+                    )}
                   </div>
                   <div className="mt-5 grid gap-3 sm:grid-cols-3">
                     <StepCard done label="Order received" />
@@ -118,32 +159,73 @@ function OrderPendingPage() {
             </div>
 
             <div className="rounded-3xl border border-border bg-white/4 p-5">
-              <div className="text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">Next step</div>
+              <div className="text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                Next step
+              </div>
               <p className="mt-3 text-sm leading-6 text-foreground/85">
-                Use <b>Track Your Orders</b> anytime with the same Transaction ID or Order ID you submitted during checkout.
+                Use <b>Track Your Orders</b> anytime with the same Transaction
+                ID or Order ID you submitted during checkout.
               </p>
               <div className="mt-4 rounded-2xl border border-accent/25 bg-accent/8 p-4 text-xs font-semibold leading-5 text-accent">
-                {isDelivered ? "Delivery has appeared below after approval." : "Delivery will appear here automatically after approval."}
+                {isRejected ? "This order is rejected. Please contact support for assistance." : isDelivered
+                  ? "Delivery has appeared below after approval."
+                  : "Delivery will appear here automatically after approval."}
               </div>
             </div>
           </div>
 
           <OrderSummary params={params} liveOrder={liveOrder} />
 
-          {isDelivered && <DeliveryCard delivery={delivery} />}
+          {!isDelivered && !isRejected && liveOrder?.manualActivationRequired && (
+            <ManualActivationCard
+              orderId={liveOrder.id}
+              productName={liveOrder.productName}
+              productLogoUrl={liveOrder.productLogoUrl}
+              productIcon={liveOrder.productIcon}
+              inputMode={liveOrder.manualInputMode}
+              submitted={Boolean(liveOrder.manualActivationSubmitted)}
+              activated={Boolean(liveOrder.manualActivationActivated)}
+              onSubmitted={() => { void refetch(); }}
+            />
+          )}
+
+          {isDelivered && (
+            <CustomerDeliveryCard
+              orderId={liveOrder?.id || params.orderId || ""}
+              delivery={delivery}
+              productName={liveOrder?.productName}
+              productLogoUrl={liveOrder?.productLogoUrl}
+              productIcon={liveOrder?.productIcon}
+            />
+          )}
 
           <div className="mt-7">
-            <SupportHelpSection title={isDelivered ? "Need help with delivery?" : "Need help while waiting?"} />
+            <SupportHelpSection
+              title={
+                isDelivered
+                  ? "Need help with delivery?"
+                  : "Need help while waiting?"
+              }
+            />
           </div>
 
           <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:justify-center">
-            <Link to="/track-orders" className="btn-ghost inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-foreground">
+            <Link
+              to="/track-orders"
+              className="btn-ghost inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-foreground"
+            >
               <Compass className="h-4 w-4" /> Track Your Orders
             </Link>
-            <Link to="/products" className="btn-ghost inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-foreground">
+            <Link
+              to="/products"
+              className="btn-ghost inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-foreground"
+            >
               <ShoppingBag className="h-4 w-4" /> Browse Products
             </Link>
-            <Link to="/" className="btn-ghost inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-foreground">
+            <Link
+              to="/"
+              className="btn-ghost inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-foreground"
+            >
               <Home className="h-4 w-4" /> Home
             </Link>
           </div>
@@ -154,39 +236,77 @@ function OrderPendingPage() {
   );
 }
 
-function StepCard({ label, done, active }: { label: string; done?: boolean; active?: boolean }) {
+function StepCard({
+  label,
+  done,
+  active,
+}: {
+  label: string;
+  done?: boolean;
+  active?: boolean;
+}) {
   return (
-    <div className={`rounded-2xl border px-4 py-3 text-xs font-bold transition-colors ${done ? "border-success/30 bg-success/10 text-success" : active ? "border-warning/35 bg-warning/10 text-warning" : "border-border bg-white/4 text-muted-foreground"}`}>
+    <div
+      className={`rounded-2xl border px-4 py-3 text-xs font-bold transition-colors ${done ? "border-success/30 bg-success/10 text-success" : active ? "border-warning/35 bg-warning/10 text-warning" : "border-border bg-white/4 text-muted-foreground"}`}
+    >
       <div className="flex items-center gap-2">
-        {done ? <CheckCircle2 className="h-4 w-4" /> : active ? <Clock className="h-4 w-4 animate-glow-pulse" /> : <span className="h-4 w-4 rounded-full border border-current" />}
+        {done ? (
+          <CheckCircle2 className="h-4 w-4" />
+        ) : active ? (
+          <Clock className="h-4 w-4 animate-glow-pulse" />
+        ) : (
+          <span className="h-4 w-4 rounded-full border border-current" />
+        )}
         {label}
       </div>
     </div>
   );
 }
 
-function OrderSummary({ params, liveOrder }: { params: z.infer<typeof search>; liveOrder?: Order }) {
+function OrderSummary({
+  params,
+  liveOrder,
+}: {
+  params: z.infer<typeof search>;
+  liveOrder?: Order;
+}) {
   const productName = liveOrder?.productName || params.productName;
-  const amount = typeof liveOrder?.amount === "number" ? liveOrder.amount : params.amount;
+  const amount =
+    typeof liveOrder?.amount === "number" ? liveOrder.amount : params.amount;
   const currency = liveOrder?.currency || params.currency;
   const method = liveOrder?.paymentMethod || params.method;
   const channel = liveOrder?.paymentChannel || params.channel;
   const transactionId = liveOrder?.transactionId || params.transactionId;
-  const customerOrderRef = liveOrder?.customerOrderRef || params.customerOrderRef;
+  const customerOrderRef =
+    liveOrder?.customerOrderRef || params.customerOrderRef;
   const orderId = liveOrder?.id || params.orderId;
 
   return (
     <div className="mt-8 rounded-3xl border border-border bg-white/4 p-5 text-left text-sm">
-      <h2 className="text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">Order summary</h2>
+      <h2 className="text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">
+        Order summary
+      </h2>
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         {orderId && <InfoRow label="Order ID" value={orderId} mono />}
         {productName && <InfoRow label="Product" value={productName} />}
-        {typeof amount === "number" && <InfoRow label="Amount" value={formatMoney(amount, currency as never)} gold />}
+        {typeof amount === "number" && (
+          <InfoRow
+            label="Amount"
+            value={formatMoney(amount, currency as never)}
+            gold
+          />
+        )}
         {method && <InfoRow label="Payment" value={methodLabel(method)} />}
         {channel && <InfoRow label="Channel" value={channel} />}
-        {transactionId && <InfoRow label="Transaction ID" value={transactionId} mono />}
-        {customerOrderRef && <InfoRow label="Your Reference" value={customerOrderRef} mono />}
-        {liveOrder?.status && <InfoRow label="Current Status" value={liveOrder.status} />}
+        {transactionId && (
+          <InfoRow label="Transaction ID" value={transactionId} mono />
+        )}
+        {customerOrderRef && (
+          <InfoRow label="Your Reference" value={customerOrderRef} mono />
+        )}
+        {liveOrder?.status && (
+          <InfoRow label="Current Status" value={liveOrder.status} />
+        )}
       </div>
     </div>
   );
@@ -201,19 +321,36 @@ function DeliveryCard({ delivery }: { delivery?: DeliveryPayload | null }) {
       <div className="flex items-center gap-2 text-sm font-bold text-success">
         <ShieldCheck className="h-4 w-4" /> Delivery details
       </div>
-      <p className="mt-2 text-sm text-muted-foreground">Keep this information private. Do not share your login or order details with anyone.</p>
+      <p className="mt-2 text-sm text-muted-foreground">
+        Keep this information private. Do not share your login or order details
+        with anyone.
+      </p>
 
       {delivery ? (
         <div className="mt-5 space-y-4">
           <InfoBox label="Login Email" value={delivery.email || ""} />
 
           <div className="rounded-2xl border border-border bg-white/5 p-4">
-            <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Password</div>
+            <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+              Password
+            </div>
             <div className="mt-2 flex items-center justify-between gap-3">
-              <span className="break-all font-mono text-lg font-bold text-foreground">{show ? password : "•".repeat(Math.max(8, password.length || 8))}</span>
+              <span className="break-all font-mono text-lg font-bold text-foreground">
+                {show
+                  ? password
+                  : "•".repeat(Math.max(8, password.length || 8))}
+              </span>
               <div className="flex gap-2">
-                <button type="button" onClick={() => setShow(!show)} className="btn-ghost rounded-lg px-2.5 py-1.5 text-xs">
-                  {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                <button
+                  type="button"
+                  onClick={() => setShow(!show)}
+                  className="btn-ghost rounded-lg px-2.5 py-1.5 text-xs"
+                >
+                  {show ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
                 </button>
                 {password && <CopyButton value={password} />}
               </div>
@@ -222,8 +359,12 @@ function DeliveryCard({ delivery }: { delivery?: DeliveryPayload | null }) {
 
           {(delivery.instruction || delivery.instructions) && (
             <div className="rounded-2xl border border-border bg-white/5 p-4">
-              <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Instructions</div>
-              <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-foreground/85">{delivery.instruction || delivery.instructions}</p>
+              <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                Instructions
+              </div>
+              <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-foreground/85">
+                {delivery.instruction || delivery.instructions}
+              </p>
             </div>
           )}
 
@@ -233,13 +374,18 @@ function DeliveryCard({ delivery }: { delivery?: DeliveryPayload | null }) {
               <div className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
                 <ImageIcon className="h-4 w-4 text-accent" /> Image guide
               </div>
-              <img src={delivery.imageUrl} alt="Delivery guide" className="max-h-[520px] w-full rounded-xl object-contain" />
+              <img
+                src={delivery.imageUrl}
+                alt="Delivery guide"
+                className="max-h-[520px] w-full rounded-xl object-contain"
+              />
             </div>
           )}
         </div>
       ) : (
         <div className="mt-4 rounded-2xl border border-dashed border-success/30 bg-white/4 p-4 text-sm text-muted-foreground">
-          Order is approved. Delivery details are loading automatically — please wait a moment.
+          Order is approved. Delivery details are loading automatically — please
+          wait a moment.
         </div>
       )}
     </div>
@@ -249,9 +395,13 @@ function DeliveryCard({ delivery }: { delivery?: DeliveryPayload | null }) {
 function InfoBox({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-2xl border border-border bg-white/5 p-4">
-      <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground">{label}</div>
+      <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+        {label}
+      </div>
       <div className="mt-2 flex items-center justify-between gap-3">
-        <span className="break-all font-mono text-lg font-bold text-foreground">{value || "Not provided"}</span>
+        <span className="break-all font-mono text-lg font-bold text-foreground">
+          {value || "Not provided"}
+        </span>
         {value && <CopyButton value={value} />}
       </div>
     </div>
@@ -274,30 +424,54 @@ function CopyButton({ value }: { value: string }) {
 }
 
 function MediaVideo({ url }: { url: string }) {
-  const yt = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([A-Za-z0-9_-]+)/)?.[1];
+  const yt = url.match(
+    /(?:youtube\.com\/watch\?v=|youtu\.be\/)([A-Za-z0-9_-]+)/,
+  )?.[1];
   const src = yt ? `https://www.youtube.com/embed/${yt}` : url;
   return (
     <div className="rounded-2xl border border-border bg-white/5 p-4">
       <div className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
         <PlayCircle className="h-4 w-4 text-accent" /> Video guide
       </div>
-      {yt ? <iframe src={src} className="aspect-video w-full rounded-xl" allowFullScreen title="Delivery video" /> : <video src={src} controls className="max-h-[520px] w-full rounded-xl" />}
+      {yt ? (
+        <iframe
+          src={src}
+          className="aspect-video w-full rounded-xl"
+          allowFullScreen
+          title="Delivery video"
+        />
+      ) : (
+        <video src={src} controls className="max-h-[520px] w-full rounded-xl" />
+      )}
     </div>
   );
 }
 
-function InfoRow({ label, value, mono, gold }: { label: string; value: string; mono?: boolean; gold?: boolean }) {
+function InfoRow({
+  label,
+  value,
+  mono,
+  gold,
+}: {
+  label: string;
+  value: string;
+  mono?: boolean;
+  gold?: boolean;
+}) {
   return (
     <div className="rounded-2xl border border-border bg-white/4 px-4 py-3">
       <div className="text-xs text-muted-foreground">{label}</div>
-      <div className={`mt-1 break-all font-bold ${mono ? "font-mono" : ""} ${gold ? "font-display text-gold-gradient" : "text-foreground"}`}>{value}</div>
+      <div
+        className={`mt-1 break-all font-bold ${mono ? "font-mono" : ""} ${gold ? "font-display text-gold-gradient" : "text-foreground"}`}
+      >
+        {value}
+      </div>
     </div>
   );
 }
 
 function methodLabel(method: Order["paymentMethod"] | string) {
   if (method === "bangladesh") return "Bangladesh";
-  if (method === "pakistan") return "Pakistan";
   if (method === "binance") return "Binance";
   return String(method);
 }

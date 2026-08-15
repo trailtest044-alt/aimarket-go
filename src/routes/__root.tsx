@@ -4,6 +4,7 @@ import {
   Link,
   createRootRouteWithContext,
   useRouter,
+  useRouterState,
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
@@ -14,6 +15,17 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { BRAND } from "../lib/brand";
 import { BrandMark } from "../components/brand-logo";
+import { CursorGlow } from "../components/cursor-glow";
+import { trackAnonymousVisit } from "../lib/api";
+
+const siteStructuredData = JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  name: BRAND.name,
+  url: "https://plandaw.com/",
+  description: BRAND.description,
+  image: "https://plandaw.com/plandaw-brand-mark.png",
+});
 
 function NotFoundComponent() {
   return (
@@ -75,24 +87,27 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { name: "theme-color", content: "#15162b" },
+      { name: "application-name", content: BRAND.name },
       { title: `${BRAND.name} — Premium AI Products & Accounts` },
       { name: "description", content: BRAND.description },
       { name: "author", content: BRAND.name },
       { property: "og:title", content: `${BRAND.name} — Premium AI Products` },
       { property: "og:description", content: BRAND.tagline },
       { property: "og:type", content: "website" },
+      { property: "og:site_name", content: BRAND.name },
+      { property: "og:image", content: "https://plandaw.com/plandaw-brand-mark.png" },
       { name: "twitter:card", content: "summary" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
-      { rel: "icon", href: "/favicon.ico" },
-      { rel: "icon", type: "image/png", href: "/favicon.png" },
-      { rel: "apple-touch-icon", href: "/apple-touch-icon.png" },
+      { rel: "icon", type: "image/png", sizes: "640x640", href: "/plandaw-brand-mark.png?v=20260730" },
+      { rel: "apple-touch-icon", href: "/plandaw-brand-mark.png?v=20260730" },
+      { rel: "manifest", href: "/site.webmanifest" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
         rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;0,9..144,700;0,9..144,800;0,9..144,900;1,9..144,600;1,9..144,700&family=Albert+Sans:wght@400;500;600;700;800&family=Hind+Siliguri:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap",
+        href: "https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400..700;1,400..700&family=IBM+Plex+Mono:wght@400;500;600&display=swap",
       },
     ],
   }),
@@ -107,6 +122,7 @@ function RootShell({ children }: { children: ReactNode }) {
     <html lang="en" className="dark">
       <head>
         <HeadContent />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: siteStructuredData }} />
       </head>
       <body>
         {children}
@@ -118,10 +134,18 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
   return (
     <QueryClientProvider client={queryClient}>
+      <VisitorTracker pathname={pathname} />
       <Outlet />
-      <Toaster theme="dark" position="top-right" richColors />
+      <CursorGlow />
+      <Toaster theme="light" position="top-right" richColors />
     </QueryClientProvider>
   );
+}
+
+function VisitorTracker({ pathname }: { pathname: string }) {
+  useEffect(() => { void trackAnonymousVisit(pathname); }, [pathname]);
+  return null;
 }

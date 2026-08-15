@@ -1,11 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { SiteHeader, SiteFooter } from "@/components/site-header";
 import { ProductDetailsView } from "@/components/product-details-view";
+import { BRAND } from "@/lib/brand";
 
 export const Route = createFileRoute("/products/$id")({
   head: ({ params }) => ({
     meta: [
-      { title: `Product — AIMarket` },
+      { title: `Product — ${BRAND.name}` },
       { name: "description", content: `Details and pricing for product ${params.id}.` },
     ],
   }),

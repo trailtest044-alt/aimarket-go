@@ -4,7 +4,9 @@ import { useState } from "react";
 import { getOrderById, getOrderDelivery, type DeliveryPayload, formatMoney } from "@/lib/api";
 import { SiteHeader, SiteFooter } from "@/components/site-header";
 import { SupportPopups, SupportHelpSection } from "@/components/support-popups";
-import { Clock, CheckCircle2, Truck, XCircle, ShieldCheck, ArrowLeft, Loader2, Copy, Eye, EyeOff } from "lucide-react";
+import { CustomerDeliveryCard } from "@/components/customer-delivery-card";
+import { ManualActivationCard } from "@/components/manual-activation-card";
+import { Clock, CheckCircle2, Truck, XCircle, Ban, ShieldCheck, ArrowLeft, Loader2, Copy, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import type { Order } from "@/lib/mock-data";
 
@@ -83,14 +85,33 @@ function OrderDetails({ order, delivery }: { order: Order; delivery?: DeliveryPa
           {order.customerOrderRef && <Row label="Your Reference" value={order.customerOrderRef} mono />}
           {order.approvedByNickname && <Row label="Approved by" value={order.approvedByNickname} />}
           {order.deliveredByNickname && <Row label="Delivered by" value={order.deliveredByNickname} />}
+          {order.cancelledAt && <Row label="Cancelled" value={new Date(order.cancelledAt).toLocaleString()} />}
           <Row label="Placed" value={new Date(order.createdAt).toLocaleString()} />
         </div>
       </div>
 
-      {(order.status === "approved" || order.status === "delivered") && <DeliveryCard delivery={delivery} />}
+      {!["approved", "delivered", "rejected", "cancelled"].includes(order.status) && order.manualActivationRequired && (
+        <ManualActivationCard
+          orderId={order.id}
+          productName={order.productName}
+          productLogoUrl={order.productLogoUrl}
+          productIcon={order.productIcon}
+          inputMode={order.manualInputMode}
+          submitted={Boolean(order.manualActivationSubmitted)}
+          activated={Boolean(order.manualActivationActivated)}
+        />
+      )}
+
+      {(order.status === "approved" || order.status === "delivered") && <CustomerDeliveryCard orderId={order.id} delivery={delivery} productName={order.productName} productLogoUrl={order.productLogoUrl} productIcon={order.productIcon} />}
       {order.status === "rejected" && (
         <div className="mt-6 rounded-2xl border border-destructive/30 bg-destructive/8 p-5 text-sm text-destructive">
           Order rejected. Please contact support for assistance.
+        </div>
+      )}
+      {order.status === "cancelled" && (
+        <div className="mt-6 rounded-2xl border border-destructive/30 bg-destructive/8 p-5 text-sm text-destructive">
+          <div className="font-bold">This order was cancelled and its delivery access has been removed.</div>
+          {order.cancelReason && <div className="mt-1 text-destructive/80">Reason: {order.cancelReason}</div>}
         </div>
       )}
     </>
@@ -189,6 +210,8 @@ function statusMeta(status: Order["status"]) {
       return { Icon: Truck, title: "Order Delivered", label: "Delivered", message: "Your delivery is ready below.", iconBg: "bg-success/12", iconColor: "text-success", badge: "border-success/30 bg-success/10 text-success" };
     case "rejected":
       return { Icon: XCircle, title: "Order Rejected", label: "Rejected", message: "Your order was rejected. Contact support for help.", iconBg: "bg-destructive/12", iconColor: "text-destructive", badge: "border-destructive/30 bg-destructive/10 text-destructive" };
+    case "cancelled":
+      return { Icon: Ban, title: "Order Cancelled", label: "Cancelled", message: "This order has been cancelled and delivery access was removed.", iconBg: "bg-destructive/12", iconColor: "text-destructive", badge: "border-destructive/30 bg-destructive/10 text-destructive" };
     default:
       return { Icon: Clock, title: "Order Pending", label: "Pending", message: "Waiting for admin approval.", iconBg: "bg-warning/12", iconColor: "text-warning", badge: "border-warning/30 bg-warning/10 text-warning" };
   }

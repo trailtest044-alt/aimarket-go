@@ -1,6 +1,6 @@
 import { createFileRoute, Outlet, useRouterState } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 import { getProducts, getCategories } from "@/lib/api";
 import { SiteHeader, SiteFooter } from "@/components/site-header";
@@ -28,23 +28,45 @@ export const Route = createFileRoute("/products")({
 
 function ProductsPage() {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
-  if (pathname !== "/products") return <Outlet />;
+  const isCatalogPage = pathname === "/products";
   const sp = Route.useSearch();
   const navigate = Route.useNavigate();
   const [q, setQ] = useState(sp.q ?? "");
   const selected = sp.category ?? "all";
 
-  const { data: products, isLoading } = useQuery({ queryKey: ["products"], queryFn: getProducts });
-  const { data: categories } = useQuery({ queryKey: ["categories"], queryFn: getCategories });
+  useEffect(() => {
+    setQ(sp.q ?? "");
+  }, [sp.q]);
+
+  const { data: products, isLoading } = useQuery({
+    queryKey: ["products"],
+    queryFn: getProducts,
+    enabled: isCatalogPage,
+    staleTime: 60_000,
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: true,
+  });
+  const { data: categories } = useQuery({ queryKey: ["categories"], queryFn: getCategories, enabled: isCatalogPage });
 
   const filtered = useMemo(() => {
     const list = products ?? [];
     return list.filter((p) => {
       const matchCat = selected === "all" || p.category === selected;
-      const matchQ = q.trim() === "" || p.name.toLowerCase().includes(q.toLowerCase()) || p.category.toLowerCase().includes(q.toLowerCase());
+      const needle = q.trim().toLowerCase();
+      const matchQ = needle === "" || [
+        p.name,
+        p.category,
+        p.shortDescription,
+        p.description,
+        p.deliveryMode,
+        p.features?.join(" "),
+      ].join(" ").toLowerCase().includes(needle);
       return matchCat && matchQ;
-    });
+    }).sort((a, b) => Number(b.stock > 0) - Number(a.stock > 0) || (a.sortOrder || 999999) - (b.sortOrder || 999999) || a.name.localeCompare(b.name));
   }, [products, selected, q]);
+
+  if (!isCatalogPage) return <Outlet />;
 
   return (
     <div className="min-h-screen">
@@ -64,7 +86,6 @@ function ProductsPage() {
               value={q}
               onChange={(e) => {
                 setQ(e.target.value);
-                navigate({ search: (prev: any) => ({ ...prev, q: e.target.value || undefined }) });
               }}
               placeholder="Search products..."
               className="input-x w-full py-3 pl-11 pr-4 text-sm"
@@ -75,7 +96,7 @@ function ProductsPage() {
             {(categories ?? []).map((c) => (
               <button
                 key={c.id}
-                onClick={() => navigate({ search: (prev: any) => ({ ...prev, category: c.id === "all" ? undefined : c.id }) })}
+                onClick={() => navigate({ search: (prev) => ({ ...prev, category: c.id === "all" ? undefined : c.id }) })}
                 data-active={c.id === selected}
                 className="chip whitespace-nowrap rounded-full px-4 py-1.5 text-xs font-semibold"
               >
@@ -89,7 +110,7 @@ function ProductsPage() {
         {/* Grid */}
         <div className="mt-8">
           {isLoading ? (
-            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="product-grid-responsive">
               {Array.from({ length: 6 }).map((_, i) => (
                 <div key={i} className="skeleton h-72" />
               ))}
@@ -101,7 +122,7 @@ function ProductsPage() {
               <p className="mt-1 text-sm text-muted-foreground">Try a different search or category.</p>
             </div>
           ) : (
-            <div className="stagger grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="product-grid-responsive stagger">
               {filtered.map((p) => <ProductCard key={p.id} p={p} />)}
             </div>
           )}
