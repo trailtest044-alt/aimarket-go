@@ -51,7 +51,7 @@ const STORAGE_KEYS = {
   customerInfo: "mp_customer_info",
   orderTokens: "mp_order_tokens",
   region: "mp_price_region_v3",
-  regionOverride: "mp_region_override",
+
   visitorId: "mp_visitor_id_v1",
   visitorSessionId: "mp_visitor_session_v1",
   productsFallback: "mp_products_fallback_v1",
@@ -59,7 +59,7 @@ const STORAGE_KEYS = {
 
 const isBrowser = typeof window !== "undefined";
 const objectIdRe = /^[a-f\d]{24}$/i;
-const REGION_CACHE_VERSION = 7;
+const REGION_CACHE_VERSION = 8;
 const PRODUCT_DEDUPE_MS = 30_000;
 let productsInFlight: Promise<Product[]> | null = null;
 let productsCache: { at: number; list: Product[] } | null = null;
@@ -368,8 +368,10 @@ function stockToDelivery(s: StockItem): DeliveryPayload {
 
 export async function getVisitorRegion(): Promise<{ region: PriceRegion; country?: string }> {
   if (isBrowser) {
-    const override = getRegionOverride();
-    if (override) return { region: override, country: override === "bd" ? "BD" : override === "pk" ? "PK" : "XX" };
+    // Old releases allowed a manual currency override. It is intentionally
+    // cleared so gateway and currency always follow the customer's IP.
+    window.localStorage.removeItem("mp_region_override");
+    window.sessionStorage.removeItem("mp_region_override");
     const cached = load<{ region?: PriceRegion; country?: string; ts?: number; version?: number } | null>(STORAGE_KEYS.region, null);
     if (cached?.region && cached.version === REGION_CACHE_VERSION && cached.ts && Date.now() - cached.ts < 1000 * 60 * 60 * 12) {
       return { region: cached.region, country: cached.country };
@@ -392,38 +394,6 @@ export async function getVisitorRegion(): Promise<{ region: PriceRegion; country
   const result = { region, country, ts: Date.now(), version: REGION_CACHE_VERSION };
   save(STORAGE_KEYS.region, result);
   return result;
-}
-
-/** Manually pin the pricing region (from the header switcher). Overrides IP detection. */
-export function setVisitorRegion(region: PriceRegion) {
-  if (!isBrowser) return;
-  window.localStorage.removeItem(STORAGE_KEYS.regionOverride);
-  window.sessionStorage.setItem(STORAGE_KEYS.regionOverride, JSON.stringify(region));
-  const country = region === "bd" ? "BD" : region === "pk" ? "PK" : "XX";
-  save(STORAGE_KEYS.region, { region, country, ts: Date.now(), version: REGION_CACHE_VERSION });
-  clearProductsCache();
-  window.dispatchEvent(new CustomEvent("price-region-changed", { detail: region }));
-}
-
-/** The pinned region, or null when detection is in charge. */
-export function getRegionOverride(): PriceRegion | null {
-  if (!isBrowser) return null;
-  window.localStorage.removeItem(STORAGE_KEYS.regionOverride);
-  let value: PriceRegion | null = null;
-  try {
-    value = JSON.parse(window.sessionStorage.getItem(STORAGE_KEYS.regionOverride) || "null") as PriceRegion | null;
-  } catch {
-    value = null;
-  }
-  return value === "bd" || value === "pk" || value === "world" ? value : null;
-}
-
-/** Drop the manual pin and clear the cached detection so IP takes over again. */
-export function clearVisitorRegionOverride() {
-  if (!isBrowser) return;
-  window.localStorage.removeItem(STORAGE_KEYS.regionOverride);
-  window.sessionStorage.removeItem(STORAGE_KEYS.regionOverride);
-  window.localStorage.removeItem(STORAGE_KEYS.region);
 }
 
 export function getCurrentCustomer(): CustomerSession | null {

@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import {
   ArrowRight,
   Clock,
@@ -23,106 +23,11 @@ import {
   getResellerProfile,
   getVisitorRegion,
   refreshCurrentCustomer,
-  setVisitorRegion,
+
   startGoogleLogin,
   type CustomerSession,
 } from "@/lib/api";
-import type { PriceRegion, Product } from "@/lib/mock-data";
-
-const REGION_OPTIONS: { key: PriceRegion; label: string }[] = [
-  { key: "bd", label: "\u09F3 BDT" },
-  { key: "pk", label: "Rs PKR" },
-  { key: "world", label: "USDT" },
-];
-
-const SEARCH_HISTORY_KEY = "aimarket_search_history";
-
-function getSearchHistory() {
-  if (typeof window === "undefined") return [];
-  try {
-    const parsed = JSON.parse(window.localStorage.getItem(SEARCH_HISTORY_KEY) || "[]");
-    return Array.isArray(parsed) ? parsed.filter((item) => typeof item === "string").slice(0, 4) : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveSearchHistory(query: string) {
-  if (typeof window === "undefined") return;
-  const cleaned = query.trim();
-  if (!cleaned) return;
-  const next = [cleaned, ...getSearchHistory().filter((item) => item.toLowerCase() !== cleaned.toLowerCase())].slice(0, 4);
-  window.localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(next));
-}
-
-function productSearchText(product: Product) {
-  return [
-    product.name,
-    product.category,
-    product.shortDescription,
-    product.description,
-    product.deliveryMode,
-    product.features?.join(" "),
-  ].join(" ").toLowerCase();
-}
-
-function RegionSwitcher({ className = "" }: { className?: string }) {
-  const [region, setRegion] = useState<PriceRegion>("bd");
-  const queryClient = useQueryClient();
-
-  useEffect(() => {
-    const syncRegion = () => {
-      getVisitorRegion().then((r) => {
-        setRegion((current) => {
-          if (current !== r.region) {
-            queryClient.invalidateQueries({ queryKey: ["products"] });
-            queryClient.invalidateQueries({ queryKey: ["categories"] });
-            queryClient.invalidateQueries({ queryKey: ["product"] });
-          }
-          return r.region;
-        });
-      }).catch(() => {});
-    };
-    const onRegionChanged = (event: Event) => {
-      const next = (event as CustomEvent<PriceRegion>).detail;
-      if (next === "bd" || next === "pk" || next === "world") setRegion(next);
-    };
-
-    syncRegion();
-    window.addEventListener("focus", syncRegion);
-    window.addEventListener("price-region-changed", onRegionChanged);
-    return () => {
-      window.removeEventListener("focus", syncRegion);
-      window.removeEventListener("price-region-changed", onRegionChanged);
-    };
-  }, [queryClient]);
-
-  const changeRegion = (next: PriceRegion) => {
-    setRegion(next);
-    setVisitorRegion(next);
-    queryClient.invalidateQueries({ queryKey: ["products"] });
-    queryClient.invalidateQueries({ queryKey: ["categories"] });
-    queryClient.invalidateQueries({ queryKey: ["product"] });
-  };
-
-  const cycleRegion = () => {
-    const index = REGION_OPTIONS.findIndex((option) => option.key === region);
-    const next = REGION_OPTIONS[(index + 1) % REGION_OPTIONS.length]?.key || "bd";
-    changeRegion(next);
-  };
-
-  return (
-    <button
-      type="button"
-      onClick={cycleRegion}
-      className={`inline-flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-xs font-semibold text-muted-foreground transition-colors hover:bg-secondary/70 ${className}`}
-      aria-label="Currency"
-    >
-      <span className="h-1.5 w-1.5 rounded-full bg-success" />
-      <span className="text-foreground">{REGION_OPTIONS.find((option) => option.key === region)?.label || "USDT"}</span>
-    </button>
-  );
-}
+import type { Product } from "@/lib/mock-data";
 
 export function SiteHeader() {
   const navigate = useNavigate();
@@ -364,7 +269,6 @@ export function SiteHeader() {
                 {n.label}
               </Link>
             ))}
-            <RegionSwitcher className="ml-1" />
             <Link to="/" hash="products" className="btn-primary ml-1 inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold">
               <ShoppingBag className="h-4 w-4" /> Shop now
             </Link>
@@ -382,7 +286,6 @@ export function SiteHeader() {
 
           <div className="flex shrink-0 items-center gap-1.5 min-[1280px]:hidden">
             <div className="hidden sm:block">
-              <RegionSwitcher />
             </div>
             {customer ? (
               <Link to="/account" className="btn-ghost inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold">
@@ -443,7 +346,6 @@ export function SiteHeader() {
                   {n.label}
                 </Link>
               ))}
-              <RegionSwitcher className="mt-2 w-full justify-center" />
               <Link to="/" hash="products" onClick={() => setOpen(false)} className="btn-primary mt-2 inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold">
                 <ShoppingBag className="h-4 w-4" /> Shop now
               </Link>

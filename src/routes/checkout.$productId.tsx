@@ -83,8 +83,9 @@ function CheckoutPage() {
   const { data: payment } = useQuery({ queryKey: ["payment"], queryFn: getPaymentSettings });
   const { data: availableProducts = [] } = useQuery({ queryKey: ["products"], queryFn: getProducts, staleTime: 60_000, refetchOnWindowFocus: false });
 
-  const [visitorRegion, setVisitorRegion] = useState<PriceRegion>("bd");
-  const [method, setMethod] = useState<Method>("bangladesh");
+  const [visitorRegion, setVisitorRegion] = useState<PriceRegion>("world");
+  const [regionReady, setRegionReady] = useState(false);
+  const [method, setMethod] = useState<Method>("pakistan");
   const [channel, setChannel] = useState<WalletKey | "">("");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -118,12 +119,25 @@ function CheckoutPage() {
   );
 
   useEffect(() => {
-    getVisitorRegion().then((r) => {
-      const region = r.region || "world";
-      setVisitorRegion(region);
-      setMethod(allowedPaymentMethods(region)[0]);
-      setChannel("");
-    });
+    let active = true;
+    getVisitorRegion()
+      .then((r) => {
+        if (!active) return;
+        const region = r.region || "world";
+        setVisitorRegion(region);
+        setMethod(allowedPaymentMethods(region)[0]);
+        setChannel("");
+      })
+      .catch(() => {
+        if (!active) return;
+        setVisitorRegion("world");
+        setMethod("pakistan");
+        setChannel("");
+      })
+      .finally(() => {
+        if (active) setRegionReady(true);
+      });
+    return () => { active = false; };
   }, []);
 
   useEffect(() => {
@@ -306,7 +320,7 @@ function CheckoutPage() {
     }
   }
 
-  if (isLoading || !customerReady) {
+  if (isLoading || !customerReady || !regionReady) {
     return (
       <div className="min-h-screen">
         <SiteHeader />
