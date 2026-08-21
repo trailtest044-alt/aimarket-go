@@ -1,12 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowDown, ArrowUp, Check, Eye, EyeOff, Pencil, Plus, Save, Search, Trash2, Users, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Eye, EyeOff, Pencil, Plus, Save, Search, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { AdminShell } from "@/components/admin-shell";
 import { ProductLogo } from "@/components/product-logo";
-import { createProduct, deleteProduct, formatMoney, getAdminProducts, getResellers, reorderProducts, updateProduct } from "@/lib/api";
-import type { AdminReseller, NewProductResellerAssignment } from "@/lib/api";
+import { createProduct, deleteProduct, formatMoney, getAdminProducts, reorderProducts, updateProduct } from "@/lib/api";
 import { useAdminAuthReady } from "@/hooks/use-admin-auth-ready";
 import { PRODUCT_LOGO_PRESETS } from "@/lib/product-logo";
 import type { DeliveryMode, ManualInputMode, Product } from "@/lib/mock-data";
@@ -18,7 +17,7 @@ const empty: Product = {
   name: "",
   category: "AI Assistants",
   price: 0,
-  currency: "USDT",
+  currency: "PKR",
   priceBDT: 0,
   pricePKR: 0,
   priceUSDT: 0,
@@ -138,9 +137,9 @@ function AdminProductsPage() {
     setOrdered(reindex(next));
   }
 
-  async function saveProduct(p: Product, resellerAssignments: NewProductResellerAssignment[] = []) {
+  async function saveProduct(p: Product) {
     const existing = products.some((x) => x.id === p.id);
-    const saved = existing ? await updateProduct(p) : await createProduct({ ...p, sortOrder: ordered.length + 1 }, resellerAssignments);
+    const saved = existing ? await updateProduct(p) : await createProduct({ ...p, sortOrder: ordered.length + 1 });
     setOrdered((current) => {
       const next = existing
         ? current.map((item) => (item.id === p.id ? saved : item))
@@ -155,6 +154,7 @@ function AdminProductsPage() {
     });
     await qc.invalidateQueries({ queryKey: ["admin-products"] });
     await qc.invalidateQueries({ queryKey: ["products"] });
+    await qc.invalidateQueries({ predicate: (query) => query.queryKey[0] === "product" });
     toast.success(existing ? "Product updated" : "Product created");
     setEditing(null);
   }
@@ -167,6 +167,7 @@ function AdminProductsPage() {
       qc.setQueryData<Product[]>(["admin-products"], (current = []) => current.map((item) => item.id === product.id ? saved : item));
       await qc.invalidateQueries({ queryKey: ["admin-products"] });
       await qc.invalidateQueries({ queryKey: ["products"] });
+      await qc.invalidateQueries({ predicate: (query) => query.queryKey[0] === "product" });
       toast.success(nextVisible ? "Product published on website" : "Product hidden from website");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not update website visibility");
@@ -251,9 +252,7 @@ function AdminProductsPage() {
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap">{p.category}</td>
                   <td className="px-4 py-3 text-xs whitespace-nowrap">
-                    <div>{formatMoney(p.priceBDT, "BDT")}</div>
                     <div>{formatMoney(p.pricePKR, "PKR")}</div>
-                    <div>{formatMoney(p.priceUSDT, p.worldwideCurrency)}</div>
                   </td>
                   <td className="px-4 py-3"><span className="inline-flex whitespace-nowrap rounded-full border border-border bg-card px-3 py-1.5 text-[10px] font-bold uppercase text-muted-foreground">{deliveryLabel(p.deliveryMode)}</span></td>
                   <td className="px-4 py-3 text-center font-semibold">{p.stock}</td>
@@ -264,13 +263,13 @@ function AdminProductsPage() {
                         type="button"
                         onClick={() => toggleWebsiteVisibility(p)}
                         className={`inline-flex min-h-9 items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold transition ${p.isActive === false ? "border-border bg-secondary text-muted-foreground hover:text-foreground" : "border-success/25 bg-success/10 text-success hover:bg-success/15"}`}
-                        title={p.isActive === false ? "Show this product on customer and reseller storefronts" : "Hide this product without deleting its data"}
+                        title={p.isActive === false ? "Show this product on the customer storefront" : "Hide this product without deleting its data"}
                       >
                         {p.isActive === false ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                         {p.isActive === false ? "Hidden" : "Visible"}
                       </button>
                       <button onClick={() => setEditing(p)} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-xs font-semibold hover:bg-secondary" title="Edit product"><Pencil className="h-4 w-4" /> Edit</button>
-                      <button onClick={async () => { await deleteProduct(p.id); setOrdered((current) => reindex(current.filter((item) => item.id !== p.id))); qc.setQueryData<Product[]>(["admin-products"], (current = []) => reindex(current.filter((item) => item.id !== p.id))); await qc.invalidateQueries({ queryKey: ["admin-products"] }); await qc.invalidateQueries({ queryKey: ["products"] }); toast.success("Product deleted"); }} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2 text-xs font-semibold text-destructive hover:bg-destructive/10" title="Delete product"><Trash2 className="h-4 w-4" /> Delete</button>
+                      <button onClick={async () => { await deleteProduct(p.id); setOrdered((current) => reindex(current.filter((item) => item.id !== p.id))); qc.setQueryData<Product[]>(["admin-products"], (current = []) => reindex(current.filter((item) => item.id !== p.id))); await qc.invalidateQueries({ queryKey: ["admin-products"] }); await qc.invalidateQueries({ queryKey: ["products"] }); await qc.invalidateQueries({ predicate: (query) => query.queryKey[0] === "product" }); toast.success("Product deleted"); }} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2 text-xs font-semibold text-destructive hover:bg-destructive/10" title="Delete product"><Trash2 className="h-4 w-4" /> Delete</button>
                     </div>
                   </td>
                 </tr>
@@ -292,49 +291,11 @@ function AdminProductsPage() {
   );
 }
 
-function EditModal({ product, existing, onClose, onSave }: { product: Product; existing: boolean; onClose: () => void; onSave: (p: Product, resellerAssignments?: NewProductResellerAssignment[]) => Promise<void> }) {
+function EditModal({ product, existing, onClose, onSave }: { product: Product; existing: boolean; onClose: () => void; onSave: (p: Product) => Promise<void> }) {
   const [p, setP] = useState<Product>({ ...product, deliveryMode: product.deliveryMode || "credentials" });
   const [featuresText, setFeaturesText] = useState(product.features.join("\n"));
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
-  const [resellerSearch, setResellerSearch] = useState("");
-  const [selectedResellerIds, setSelectedResellerIds] = useState<string[]>([]);
-  const [samePriceForAll, setSamePriceForAll] = useState(true);
-  const [sharedResellerPriceBDT, setSharedResellerPriceBDT] = useState("");
-  const [sharedResellerPricePKR, setSharedResellerPricePKR] = useState("");
-  const [sharedResellerPriceUSDT, setSharedResellerPriceUSDT] = useState("");
-  const [individualPrices, setIndividualPrices] = useState<Record<string, { bdt: string; pkr: string; usdt: string }>>({});
-  const { data: resellers = [], isLoading: resellersLoading } = useQuery({
-    queryKey: ["admin-resellers-for-product"],
-    queryFn: () => getResellers(),
-    enabled: !existing,
-    staleTime: 30_000,
-  });
-  const eligibleResellers = useMemo(() => resellers.filter((reseller) => reseller.status !== "suspended"), [resellers]);
-  const visibleResellers = useMemo(() => {
-    const query = resellerSearch.trim().toLowerCase();
-    return query ? eligibleResellers.filter((reseller) => `${reseller.name} ${reseller.email}`.toLowerCase().includes(query)) : eligibleResellers;
-  }, [eligibleResellers, resellerSearch]);
-
-  function toggleReseller(reseller: AdminReseller) {
-    setSelectedResellerIds((current) => current.includes(reseller.id) ? current.filter((id) => id !== reseller.id) : [...current, reseller.id]);
-  }
-
-  function resellerAssignments(): NewProductResellerAssignment[] {
-    return selectedResellerIds.map((resellerId) => {
-      const own = individualPrices[resellerId] || { bdt: "", pkr: "", usdt: "" };
-      const bdt = samePriceForAll ? sharedResellerPriceBDT : own.bdt;
-      const pkr = samePriceForAll ? sharedResellerPricePKR : own.pkr;
-      const usdt = samePriceForAll ? sharedResellerPriceUSDT : own.usdt;
-      return {
-        resellerId,
-        priceBDT: bdt === "" ? null : Math.max(0, Number(bdt) || 0),
-        pricePKR: pkr === "" ? null : Math.max(0, Number(pkr) || 0),
-        priceUSDT: usdt === "" ? null : Math.max(0, Number(usdt) || 0),
-      };
-    });
-  }
-
   async function handleSave() {
     if (saving) return;
     if (p.name.trim().length < 2) {
@@ -345,10 +306,14 @@ function EditModal({ product, existing, onClose, onSave }: { product: Product; e
       setSaveError("Product category is required.");
       return;
     }
+    if (Number(p.pricePKR || 0) <= 0) {
+      setSaveError("Selling price must be greater than zero PKR.");
+      return;
+    }
     try {
       setSaving(true);
       setSaveError("");
-      await onSave({ ...p, name: p.name.trim(), category: p.category.trim(), price: p.priceUSDT, currency: p.worldwideCurrency }, existing ? [] : resellerAssignments());
+      await onSave({ ...p, name: p.name.trim(), category: p.category.trim(), price: p.pricePKR, currency: "PKR", priceRegion: "pk", isFree: false });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Could not save this product.";
       setSaveError(message);
@@ -392,85 +357,16 @@ function EditModal({ product, existing, onClose, onSave }: { product: Product; e
           </div>
           <Input label="Icon fallback" value={p.icon} onChange={(v) => setP({ ...p, icon: v })} />
           <Input label="Badge" value={p.badge ?? ""} onChange={(v) => setP({ ...p, badge: v || undefined })} />
-          <Input label="BDT Price" type="number" value={String(p.priceBDT)} onChange={(v) => setP({ ...p, priceBDT: parseFloat(v) || 0 })} />
-          <Input label="PKR Price" type="number" value={String(p.pricePKR)} onChange={(v) => setP({ ...p, pricePKR: parseFloat(v) || 0 })} />
-          <Input label="USDT Price" type="number" value={String(p.priceUSDT)} onChange={(v) => setP({ ...p, priceUSDT: parseFloat(v) || 0 })} />
-          <label className="sm:col-span-2 flex cursor-pointer items-center justify-between gap-4 rounded-2xl border border-emerald-300/60 bg-emerald-50/70 p-4 text-emerald-950">
-            <span>
-              <span className="block text-sm font-bold">Free product — no payment required</span>
-              <span className="mt-1 block text-xs leading-5">Buyer submits once and available stock is delivered automatically. Manual-delivery and backorder items still wait for fulfilment.</span>
-            </span>
-            <input type="checkbox" checked={p.isFree === true} onChange={(event) => setP(event.target.checked ? { ...p, isFree: true, priceBDT: 0, pricePKR: 0, priceUSDT: 0, originalPriceBDT: 0, originalPricePKR: 0, originalPriceUSDT: 0 } : { ...p, isFree: false })} className="h-5 w-5 shrink-0 accent-emerald-600" />
-          </label>
-          <div className="rounded-xl border border-border bg-secondary/30 px-3 py-2.5 text-sm font-semibold text-muted-foreground">Worldwide currency: USDT</div>
-          <Input label="Original BDT Price" type="number" value={String(p.originalPriceBDT ?? "")} onChange={(v) => setP({ ...p, originalPriceBDT: v ? parseFloat(v) : undefined })} />
+          <Input label="Selling price (PKR)" type="number" value={String(p.pricePKR)} onChange={(v) => setP({ ...p, pricePKR: Math.max(0, parseFloat(v) || 0) })} />
           <Input label="Original PKR Price" type="number" value={String(p.originalPricePKR ?? "")} onChange={(v) => setP({ ...p, originalPricePKR: v ? parseFloat(v) : undefined })} />
-          <Input label="Original USDT Price" type="number" value={String(p.originalPriceUSDT ?? "")} onChange={(v) => setP({ ...p, originalPriceUSDT: v ? parseFloat(v) : undefined })} />
+          <Input label="Buying price (PKR)" type="number" value={String(p.purchaseCostPKR ?? "")} onChange={(v) => setP({ ...p, purchaseCostPKR: Math.max(0, parseFloat(v) || 0) })} />
           <label className="sm:col-span-2 flex cursor-pointer items-center justify-between gap-4 rounded-2xl border border-border bg-card/70 p-4">
             <span>
               <span className="block text-sm font-bold">Show on website</span>
-              <span className="mt-1 block text-xs leading-5 text-muted-foreground">Turn this off to keep the product, stock and history in admin while hiding it from customer and reseller storefronts.</span>
+              <span className="mt-1 block text-xs leading-5 text-muted-foreground">Turn this off to keep the product, stock and history in admin while hiding it from customers.</span>
             </span>
             <input type="checkbox" checked={p.isActive !== false} onChange={(event) => setP({ ...p, isActive: event.target.checked })} className="h-5 w-5 shrink-0 accent-primary" />
           </label>
-          {!existing && (
-            <div className="sm:col-span-2 rounded-2xl border border-primary/20 bg-primary/5 p-4">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                  <div className="flex items-center gap-2 text-sm font-bold"><Users className="h-4 w-4 text-primary" /> Reseller visibility & price</div>
-                  <p className="mt-1 text-xs leading-5 text-muted-foreground">Select the resellers who can see this new product. Unselected resellers will not receive access.</p>
-                </div>
-                <div className="rounded-full border border-primary/20 bg-card px-3 py-1 text-xs font-bold text-primary">{selectedResellerIds.length} selected</div>
-              </div>
-              <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-                <label className="flex flex-1 items-center gap-2 rounded-xl border border-border bg-card px-3 py-2">
-                  <Search className="h-4 w-4 text-muted-foreground" />
-                  <input value={resellerSearch} onChange={(event) => setResellerSearch(event.target.value)} placeholder="Search reseller name or Gmail..." className="min-w-0 flex-1 bg-transparent text-sm outline-none" />
-                </label>
-                <button type="button" onClick={() => setSelectedResellerIds(eligibleResellers.map((reseller) => reseller.id))} className="rounded-xl border border-border bg-card px-3 py-2 text-xs font-bold hover:bg-secondary">Select all</button>
-                <button type="button" onClick={() => setSelectedResellerIds([])} className="rounded-xl border border-border bg-card px-3 py-2 text-xs font-bold hover:bg-secondary">Clear</button>
-              </div>
-              <div className="mt-3 max-h-48 space-y-2 overflow-y-auto pr-1">
-                {resellersLoading ? <div className="rounded-xl border border-border bg-card p-4 text-center text-xs text-muted-foreground">Loading resellers...</div> : visibleResellers.length === 0 ? <div className="rounded-xl border border-border bg-card p-4 text-center text-xs text-muted-foreground">No eligible reseller found.</div> : visibleResellers.map((reseller) => {
-                  const selected = selectedResellerIds.includes(reseller.id);
-                  const own = individualPrices[reseller.id] || { bdt: "", pkr: "", usdt: "" };
-                  return (
-                    <div key={reseller.id} className={`rounded-xl border p-3 transition ${selected ? "border-primary/40 bg-card shadow-sm" : "border-border bg-card/60"}`}>
-                      <div className="flex items-center gap-3">
-                        <button type="button" onClick={() => toggleReseller(reseller)} className={`grid h-5 w-5 shrink-0 place-items-center rounded border ${selected ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background"}`} aria-label={`${selected ? "Remove" : "Select"} ${reseller.email}`}>{selected && <Check className="h-3.5 w-3.5" />}</button>
-                        <button type="button" onClick={() => toggleReseller(reseller)} className="min-w-0 flex-1 text-left"><div className="truncate text-sm font-bold">{reseller.name || reseller.email.split("@")[0]}</div><div className="truncate text-xs text-muted-foreground">{reseller.email}</div></button>
-                        <span className="rounded-full bg-secondary px-2 py-1 text-[10px] font-bold uppercase text-muted-foreground">{reseller.status}</span>
-                      </div>
-                      {selected && !samePriceForAll && <div className="mt-3 grid gap-2 sm:grid-cols-3"><Input label="Reseller BDT price" type="number" value={own.bdt} onChange={(value) => setIndividualPrices((current) => ({ ...current, [reseller.id]: { ...own, bdt: value } }))} /><Input label="Reseller PKR price" type="number" value={own.pkr} onChange={(value) => setIndividualPrices((current) => ({ ...current, [reseller.id]: { ...own, pkr: value } }))} /><Input label="Reseller USDT price" type="number" value={own.usdt} onChange={(value) => setIndividualPrices((current) => ({ ...current, [reseller.id]: { ...own, usdt: value } }))} /></div>}
-                    </div>
-                  );
-                })}
-              </div>
-              {selectedResellerIds.length > 0 && <div className="mt-3 rounded-xl border border-border bg-card p-3">
-                <label className="flex cursor-pointer items-center gap-2 text-sm font-bold"><input type="checkbox" checked={samePriceForAll} onChange={(event) => setSamePriceForAll(event.target.checked)} className="h-4 w-4 accent-primary" /> Same price for all selected resellers</label>
-                {samePriceForAll && <div className="mt-3 grid gap-3 sm:grid-cols-3"><Input label="Shared reseller BDT price" type="number" value={sharedResellerPriceBDT} onChange={setSharedResellerPriceBDT} /><Input label="Shared reseller PKR price" type="number" value={sharedResellerPricePKR} onChange={setSharedResellerPricePKR} /><Input label="Shared reseller USDT price" type="number" value={sharedResellerPriceUSDT} onChange={setSharedResellerPriceUSDT} /></div>}
-                <p className="mt-2 text-xs text-muted-foreground">Leave a price blank to use the product's normal price for that currency.</p>
-              </div>}
-            </div>
-          )}
-          <div className="sm:col-span-2 rounded-2xl border border-border bg-card/70 p-3">
-            <div className="text-xs font-bold uppercase tracking-[0.16em] text-muted-foreground">Profit inputs (optional)</div>
-            <p className="mt-1 text-xs text-muted-foreground">Used only for real dashboard net profit. Leave blank if unknown.</p>
-            <div className="mt-3 grid gap-3 sm:grid-cols-3">
-              <Input label="Purchase cost BDT" type="number" value={String(p.purchaseCostBDT ?? "")} onChange={(v) => setP({ ...p, purchaseCostBDT: parseFloat(v) || 0 })} />
-              <Input label="Purchase cost PKR" type="number" value={String(p.purchaseCostPKR ?? "")} onChange={(v) => setP({ ...p, purchaseCostPKR: parseFloat(v) || 0 })} />
-              <Input label="Purchase cost USDT" type="number" value={String(p.purchaseCostUSDT ?? "")} onChange={(v) => setP({ ...p, purchaseCostUSDT: parseFloat(v) || 0 })} />
-              <Input label="Account cost BDT" type="number" value={String(p.accountCostBDT ?? "")} onChange={(v) => setP({ ...p, accountCostBDT: parseFloat(v) || 0 })} />
-              <Input label="Account cost PKR" type="number" value={String(p.accountCostPKR ?? "")} onChange={(v) => setP({ ...p, accountCostPKR: parseFloat(v) || 0 })} />
-              <Input label="Account cost USDT" type="number" value={String(p.accountCostUSDT ?? "")} onChange={(v) => setP({ ...p, accountCostUSDT: parseFloat(v) || 0 })} />
-              <Input label="Gateway fee BDT" type="number" value={String(p.paymentGatewayFeeBDT ?? "")} onChange={(v) => setP({ ...p, paymentGatewayFeeBDT: parseFloat(v) || 0 })} />
-              <Input label="Gateway fee PKR" type="number" value={String(p.paymentGatewayFeePKR ?? "")} onChange={(v) => setP({ ...p, paymentGatewayFeePKR: parseFloat(v) || 0 })} />
-              <Input label="Gateway fee USDT" type="number" value={String(p.paymentGatewayFeeUSDT ?? "")} onChange={(v) => setP({ ...p, paymentGatewayFeeUSDT: parseFloat(v) || 0 })} />
-              <Input label="Other expense BDT" type="number" value={String(p.otherExpenseBDT ?? "")} onChange={(v) => setP({ ...p, otherExpenseBDT: parseFloat(v) || 0 })} />
-              <Input label="Other expense PKR" type="number" value={String(p.otherExpensePKR ?? "")} onChange={(v) => setP({ ...p, otherExpensePKR: parseFloat(v) || 0 })} />
-              <Input label="Other expense USDT" type="number" value={String(p.otherExpenseUSDT ?? "")} onChange={(v) => setP({ ...p, otherExpenseUSDT: parseFloat(v) || 0 })} />
-            </div>
-          </div>
           <Select label="Delivery system" value={p.deliveryMode || "credentials"} onChange={(v) => setP({ ...p, deliveryMode: v as DeliveryMode })} options={deliveryOptions} />
           <Input label="Delivery text shown to buyer" value={p.deliveryMethod} onChange={(v) => setP({ ...p, deliveryMethod: v })} />
           <div className="sm:col-span-2 rounded-2xl border border-amber-300/60 bg-amber-50/70 p-3">

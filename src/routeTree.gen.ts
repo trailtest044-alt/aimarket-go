@@ -10,7 +10,6 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as AccountRouteImport } from './routes/account'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as OrderPendingRouteImport } from './routes/order-pending'
 import { Route as ProductsRouteImport } from './routes/products'
@@ -23,7 +22,6 @@ import { Route as AdminOrdersRouteImport } from './routes/admin.orders'
 import { Route as AdminPaymentSettingsRouteImport } from './routes/admin.payment-settings'
 import { Route as AdminProductsRouteImport } from './routes/admin.products'
 import { Route as AdminPromoCodesRouteImport } from './routes/admin.promo-codes'
-import { Route as AdminResellersRouteImport } from './routes/admin.resellers'
 import { Route as AdminStockRouteImport } from './routes/admin.stock'
 import { Route as AdminTrackOrdersRouteImport } from './routes/admin.track-orders'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
@@ -38,17 +36,10 @@ import { Route as AdminOrdersCancelRouteImport } from './routes/admin.orders.can
 import { Route as AdminOrdersDeliveredRouteImport } from './routes/admin.orders.delivered'
 import { Route as AdminOrdersPendingRouteImport } from './routes/admin.orders.pending'
 import { Route as AdminOrdersRejectedRouteImport } from './routes/admin.orders.rejected'
-import { Route as AdminResellersIdRouteImport } from './routes/admin.resellers.$id'
-import { Route as AuthGoogleCallbackRouteImport } from './routes/auth.google.callback'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AccountRoute = AccountRouteImport.update({
-  id: '/account',
-  path: '/account',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminRoute = AdminRouteImport.update({
@@ -109,11 +100,6 @@ const AdminProductsRoute = AdminProductsRouteImport.update({
 const AdminPromoCodesRoute = AdminPromoCodesRouteImport.update({
   id: '/promo-codes',
   path: '/promo-codes',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminResellersRoute = AdminResellersRouteImport.update({
-  id: '/resellers',
-  path: '/resellers',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminStockRoute = AdminStockRouteImport.update({
@@ -187,20 +173,9 @@ const AdminOrdersRejectedRoute = AdminOrdersRejectedRouteImport.update({
   path: '/rejected',
   getParentRoute: () => AdminOrdersRoute,
 } as any)
-const AdminResellersIdRoute = AdminResellersIdRouteImport.update({
-  id: '/$id',
-  path: '/$id',
-  getParentRoute: () => AdminResellersRoute,
-} as any)
-const AuthGoogleCallbackRoute = AuthGoogleCallbackRouteImport.update({
-  id: '/auth/google/callback',
-  path: '/auth/google/callback',
-  getParentRoute: () => rootRouteImport,
-} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/account': typeof AccountRoute
   '/admin': typeof AdminRouteWithChildren
   '/order-pending': typeof OrderPendingRoute
   '/products': typeof ProductsRouteWithChildren
@@ -212,7 +187,6 @@ export interface FileRoutesByFullPath {
   '/admin/payment-settings': typeof AdminPaymentSettingsRoute
   '/admin/products': typeof AdminProductsRoute
   '/admin/promo-codes': typeof AdminPromoCodesRoute
-  '/admin/resellers': typeof AdminResellersRouteWithChildren
   '/admin/stock': typeof AdminStockRoute
   '/admin/track-orders': typeof AdminTrackOrdersRoute
   '/admin/users': typeof AdminUsersRoute
@@ -227,13 +201,10 @@ export interface FileRoutesByFullPath {
   '/admin/orders/delivered': typeof AdminOrdersDeliveredRoute
   '/admin/orders/pending': typeof AdminOrdersPendingRoute
   '/admin/orders/rejected': typeof AdminOrdersRejectedRoute
-  '/admin/resellers/$id': typeof AdminResellersIdRoute
-  '/auth/google/callback': typeof AuthGoogleCallbackRoute
   '/admin/orders/': typeof AdminOrdersIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/account': typeof AccountRoute
   '/order-pending': typeof OrderPendingRoute
   '/products': typeof ProductsRouteWithChildren
   '/track-orders': typeof TrackOrdersRoute
@@ -243,7 +214,6 @@ export interface FileRoutesByTo {
   '/admin/payment-settings': typeof AdminPaymentSettingsRoute
   '/admin/products': typeof AdminProductsRoute
   '/admin/promo-codes': typeof AdminPromoCodesRoute
-  '/admin/resellers': typeof AdminResellersRouteWithChildren
   '/admin/stock': typeof AdminStockRoute
   '/admin/track-orders': typeof AdminTrackOrdersRoute
   '/admin/users': typeof AdminUsersRoute
@@ -258,14 +228,11 @@ export interface FileRoutesByTo {
   '/admin/orders/delivered': typeof AdminOrdersDeliveredRoute
   '/admin/orders/pending': typeof AdminOrdersPendingRoute
   '/admin/orders/rejected': typeof AdminOrdersRejectedRoute
-  '/admin/resellers/$id': typeof AdminResellersIdRoute
-  '/auth/google/callback': typeof AuthGoogleCallbackRoute
   '/admin/orders': typeof AdminOrdersIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/account': typeof AccountRoute
   '/admin': typeof AdminRouteWithChildren
   '/order-pending': typeof OrderPendingRoute
   '/products': typeof ProductsRouteWithChildren
@@ -277,7 +244,6 @@ export interface FileRoutesById {
   '/admin/payment-settings': typeof AdminPaymentSettingsRoute
   '/admin/products': typeof AdminProductsRoute
   '/admin/promo-codes': typeof AdminPromoCodesRoute
-  '/admin/resellers': typeof AdminResellersRouteWithChildren
   '/admin/stock': typeof AdminStockRoute
   '/admin/track-orders': typeof AdminTrackOrdersRoute
   '/admin/users': typeof AdminUsersRoute
@@ -292,15 +258,12 @@ export interface FileRoutesById {
   '/admin/orders/delivered': typeof AdminOrdersDeliveredRoute
   '/admin/orders/pending': typeof AdminOrdersPendingRoute
   '/admin/orders/rejected': typeof AdminOrdersRejectedRoute
-  '/admin/resellers/$id': typeof AdminResellersIdRoute
-  '/auth/google/callback': typeof AuthGoogleCallbackRoute
   '/admin/orders/': typeof AdminOrdersIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/account'
     | '/admin'
     | '/order-pending'
     | '/products'
@@ -312,7 +275,6 @@ export interface FileRouteTypes {
     | '/admin/payment-settings'
     | '/admin/products'
     | '/admin/promo-codes'
-    | '/admin/resellers'
     | '/admin/stock'
     | '/admin/track-orders'
     | '/admin/users'
@@ -327,13 +289,10 @@ export interface FileRouteTypes {
     | '/admin/orders/delivered'
     | '/admin/orders/pending'
     | '/admin/orders/rejected'
-    | '/admin/resellers/$id'
-    | '/auth/google/callback'
     | '/admin/orders/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/account'
     | '/order-pending'
     | '/products'
     | '/track-orders'
@@ -343,7 +302,6 @@ export interface FileRouteTypes {
     | '/admin/payment-settings'
     | '/admin/products'
     | '/admin/promo-codes'
-    | '/admin/resellers'
     | '/admin/stock'
     | '/admin/track-orders'
     | '/admin/users'
@@ -358,13 +316,10 @@ export interface FileRouteTypes {
     | '/admin/orders/delivered'
     | '/admin/orders/pending'
     | '/admin/orders/rejected'
-    | '/admin/resellers/$id'
-    | '/auth/google/callback'
     | '/admin/orders'
   id:
     | '__root__'
     | '/'
-    | '/account'
     | '/admin'
     | '/order-pending'
     | '/products'
@@ -376,7 +331,6 @@ export interface FileRouteTypes {
     | '/admin/payment-settings'
     | '/admin/products'
     | '/admin/promo-codes'
-    | '/admin/resellers'
     | '/admin/stock'
     | '/admin/track-orders'
     | '/admin/users'
@@ -391,21 +345,17 @@ export interface FileRouteTypes {
     | '/admin/orders/delivered'
     | '/admin/orders/pending'
     | '/admin/orders/rejected'
-    | '/admin/resellers/$id'
-    | '/auth/google/callback'
     | '/admin/orders/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  AccountRoute: typeof AccountRoute
   AdminRoute: typeof AdminRouteWithChildren
   OrderPendingRoute: typeof OrderPendingRoute
   ProductsRoute: typeof ProductsRouteWithChildren
   TrackOrdersRoute: typeof TrackOrdersRoute
   CheckoutProductIdRoute: typeof CheckoutProductIdRoute
   OrderStatusOrderIdRoute: typeof OrderStatusOrderIdRoute
-  AuthGoogleCallbackRoute: typeof AuthGoogleCallbackRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -415,13 +365,6 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/account': {
-      id: '/account'
-      path: '/account'
-      fullPath: '/account'
-      preLoaderRoute: typeof AccountRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin': {
@@ -506,13 +449,6 @@ declare module '@tanstack/react-router' {
       path: '/promo-codes'
       fullPath: '/admin/promo-codes'
       preLoaderRoute: typeof AdminPromoCodesRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/resellers': {
-      id: '/admin/resellers'
-      path: '/resellers'
-      fullPath: '/admin/resellers'
-      preLoaderRoute: typeof AdminResellersRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/stock': {
@@ -613,20 +549,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminOrdersRejectedRouteImport
       parentRoute: typeof AdminOrdersRoute
     }
-    '/admin/resellers/$id': {
-      id: '/admin/resellers/$id'
-      path: '/$id'
-      fullPath: '/admin/resellers/$id'
-      preLoaderRoute: typeof AdminResellersIdRouteImport
-      parentRoute: typeof AdminResellersRoute
-    }
-    '/auth/google/callback': {
-      id: '/auth/google/callback'
-      path: '/auth/google/callback'
-      fullPath: '/auth/google/callback'
-      preLoaderRoute: typeof AuthGoogleCallbackRouteImport
-      parentRoute: typeof rootRouteImport
-    }
   }
 }
 
@@ -666,18 +588,6 @@ const AdminOrdersRouteWithChildren = AdminOrdersRoute._addFileChildren(
   AdminOrdersRouteChildren,
 )
 
-interface AdminResellersRouteChildren {
-  AdminResellersIdRoute: typeof AdminResellersIdRoute
-}
-
-const AdminResellersRouteChildren: AdminResellersRouteChildren = {
-  AdminResellersIdRoute: AdminResellersIdRoute,
-}
-
-const AdminResellersRouteWithChildren = AdminResellersRoute._addFileChildren(
-  AdminResellersRouteChildren,
-)
-
 interface AdminRouteChildren {
   AdminCustomersRoute: typeof AdminCustomersRouteWithChildren
   AdminLoginRoute: typeof AdminLoginRoute
@@ -686,7 +596,6 @@ interface AdminRouteChildren {
   AdminPaymentSettingsRoute: typeof AdminPaymentSettingsRoute
   AdminProductsRoute: typeof AdminProductsRoute
   AdminPromoCodesRoute: typeof AdminPromoCodesRoute
-  AdminResellersRoute: typeof AdminResellersRouteWithChildren
   AdminStockRoute: typeof AdminStockRoute
   AdminTrackOrdersRoute: typeof AdminTrackOrdersRoute
   AdminUsersRoute: typeof AdminUsersRoute
@@ -701,7 +610,6 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminPaymentSettingsRoute: AdminPaymentSettingsRoute,
   AdminProductsRoute: AdminProductsRoute,
   AdminPromoCodesRoute: AdminPromoCodesRoute,
-  AdminResellersRoute: AdminResellersRouteWithChildren,
   AdminStockRoute: AdminStockRoute,
   AdminTrackOrdersRoute: AdminTrackOrdersRoute,
   AdminUsersRoute: AdminUsersRoute,
@@ -724,14 +632,12 @@ const ProductsRouteWithChildren = ProductsRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  AccountRoute: AccountRoute,
   AdminRoute: AdminRouteWithChildren,
   OrderPendingRoute: OrderPendingRoute,
   ProductsRoute: ProductsRouteWithChildren,
   TrackOrdersRoute: TrackOrdersRoute,
   CheckoutProductIdRoute: CheckoutProductIdRoute,
   OrderStatusOrderIdRoute: OrderStatusOrderIdRoute,
-  AuthGoogleCallbackRoute: AuthGoogleCallbackRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -1,5 +1,5 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { ArrowRight, Bell, Box, ClipboardList, LayoutDashboard, Loader2, Mail, Package, Wallet, Boxes, Clock, CheckCircle2, Truck, XCircle, LogOut, Users, Search, BadgePercent, FileText, PlusCircle, Sparkles, ShoppingBag, X, UserSearch, Handshake, Ban } from "lucide-react";
+import { ArrowRight, Bell, Box, ClipboardList, LayoutDashboard, Loader2, Mail, Package, Wallet, Boxes, Clock, CheckCircle2, Truck, XCircle, LogOut, Users, Search, BadgePercent, FileText, PlusCircle, Sparkles, ShoppingBag, X, UserSearch, Ban } from "lucide-react";
 import { adminLogout, isAdminAuthed, getCurrentAdmin, getDashboard, getAdminProducts, searchAdminOrders, searchCustomers } from "@/lib/api";
 import { useEffect, useState, type ReactNode, type ComponentType } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -32,7 +32,6 @@ const navGroups: Array<{ label: string; items: NavItem[] }> = [
   { label: "Customers", items: [
     { to: "/admin/customers", label: "User List", icon: Users },
     { to: "/admin/customers/search", label: "Customer Search", icon: UserSearch },
-    { to: "/admin/resellers", label: "Resellers", icon: Handshake, ownerOnly: true },
   ] },
   { label: "Finance", items: [
     { to: "/admin/payment-settings", label: "Payment Settings", icon: Wallet },

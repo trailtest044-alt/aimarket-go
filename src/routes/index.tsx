@@ -187,7 +187,7 @@ function PromoBanner({ promos, products }: { promos: HomepagePromo[]; products: 
                 .map((product) => product.name)
                 .join(", ") || "selected products"
             : "all products";
-          const saving = promo.discountType === "percent" ? `${promo.percentOff || 0}% OFF` : `৳${promo.fixedBDT || 0} OFF`;
+          const saving = promo.discountType === "percent" ? `${promo.percentOff || 0}% OFF` : `Rs ${promo.fixedPKR || 0} OFF`;
           return (
             <Link key={promo.code} to="/products" className="inline-flex items-center gap-2 rounded-full border border-amber-300/60 bg-white/85 px-3 py-1.5 shadow-sm transition hover:-translate-y-0.5 hover:bg-white">
               <Sparkles className="h-3.5 w-3.5 text-amber-600" />

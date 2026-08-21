@@ -59,11 +59,15 @@ const STORAGE_KEYS = {
 
 const isBrowser = typeof window !== "undefined";
 const objectIdRe = /^[a-f\d]{24}$/i;
-const REGION_CACHE_VERSION = 8;
+const REGION_CACHE_VERSION = 9;
 const PRODUCT_DEDUPE_MS = 30_000;
 let productsInFlight: Promise<Product[]> | null = null;
 let productsCache: { at: number; list: Product[] } | null = null;
-function clearProductsCache() { productsCache = null; productsInFlight = null; }
+function clearProductsCache() {
+  productsCache = null;
+  productsInFlight = null;
+  if (isBrowser) window.localStorage.removeItem(STORAGE_KEYS.productsFallback);
+}
 type StoredRegion = PriceRegion | { region?: PriceRegion; country?: string; ts?: number; version?: number } | null;
 
 function load<T>(key: string, fallback: T): T {
@@ -180,20 +184,15 @@ export type ResellerPaymentRequest = { _id?: string; id?: string; resellerId: st
 function slugify(value: string) { return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)+/g, "") || `product-${Date.now()}`; }
 function money(value: unknown): number { const n = Number(value); return Number.isFinite(n) ? n : 0; }
 
-export function formatMoney(amount: number, currency: CurrencyCode = "USDT") {
-  if (currency === "BDT") return `\u09F3${Math.round(amount).toLocaleString("en-BD")}`;
-  if (currency === "PKR") return `Rs ${Math.round(amount).toLocaleString("en-PK")}`;
-  return `${Number(amount).toFixed(2)} ${currency}`;
+export function formatMoney(amount: number, currency: CurrencyCode = "PKR") {
+  return `Rs ${Math.round(Number(amount) || 0).toLocaleString("en-PK")}`;
 }
 export function priceForRegion(product: Product, region: PriceRegion) {
-  const regionalAmount = region === "bd" ? product.priceBDT : region === "pk" ? product.pricePKR : product.priceUSDT;
-  const currency = region === "bd" ? "BDT" as CurrencyCode : region === "pk" ? "PKR" as CurrencyCode : (product.worldwideCurrency || "USDT") as CurrencyCode;
-  if (product.isFree || Number(regionalAmount || 0) <= 0) return { amount: 0, currency };
-  return { amount: regionalAmount, currency };
+  return { amount: Number(product.pricePKR || product.price || 0), currency: "PKR" as CurrencyCode };
 }
-export function methodForRegion(region: PriceRegion): "bangladesh" | "pakistan" | "binance" { return region === "bd" ? "bangladesh" : region === "pk" ? "pakistan" : "binance"; }
-export function allowedPaymentMethods(region: PriceRegion): Array<"bangladesh" | "pakistan" | "binance"> { return region === "bd" ? ["bangladesh"] : ["pakistan", "binance"]; }
-export function priceRegionForPaymentMethod(method: Order["paymentMethod"]): PriceRegion { if (method === "bangladesh" || method === "reseller_due" || method === "free") return "bd"; if (method === "pakistan") return "pk"; return "world"; }
+export function methodForRegion(region: PriceRegion): "pakistan" { return "pakistan"; }
+export function allowedPaymentMethods(region: PriceRegion): Array<"pakistan"> { return ["pakistan"]; }
+export function priceRegionForPaymentMethod(method: Order["paymentMethod"]): PriceRegion { return "pk"; }
 
 function freshPath(path: string): string {
   const separator = path.includes("?") ? "&" : "?";
@@ -260,23 +259,19 @@ async function detectClientCountry(): Promise<string> {
 }
 
 function productToFrontend(p: BackendProduct): Product {
-  const priceBDT = money(p.priceBDT);
-  const pricePKR = money(p.pricePKR);
-  const priceUSDT = money(p.priceUSDT);
-  const displayRegion = p.displayPrice?.region || normalizeStoredRegion(load<StoredRegion>(STORAGE_KEYS.region, "world"));
-  const display = p.displayPrice || (displayRegion === "bd" ? { amount: priceBDT, currency: "BDT" as CurrencyCode, region: "bd" as PriceRegion } : displayRegion === "pk" ? { amount: pricePKR, currency: "PKR" as CurrencyCode, region: "pk" as PriceRegion } : { amount: priceUSDT, currency: (p.worldwideCurrency || "USDT") as CurrencyCode, region: "world" as PriceRegion });
+  const pricePKR = p.pricePKR == null && p.displayPrice?.region === "pk" ? money(p.displayPrice.amount) : money(p.pricePKR);
   return {
     id: p.slug || p._id,
     backendId: p._id,
     name: p.title,
     category: p.category || "AI Tools",
-    price: p.isFree === true || money(display.amount) <= 0 ? 0 : money(display.amount),
-    currency: display.currency,
-    priceRegion: display.region,
-    priceBDT, pricePKR, priceUSDT,
-    isFree: p.isFree === true,
+    price: pricePKR,
+    currency: "PKR",
+    priceRegion: "pk",
+    priceBDT: 0, pricePKR, priceUSDT: 0,
+    isFree: false,
     worldwideCurrency: p.worldwideCurrency || "USDT",
-    originalPrice: p.isFree === true || money(display.amount) <= 0 ? 0 : (display.region === "bd" ? money(p.originalPriceBDT) : display.region === "pk" ? money(p.originalPricePKR) : money(p.originalPriceUSDT)),
+    originalPrice: money(p.originalPricePKR),
     originalPriceBDT: money(p.originalPriceBDT), originalPricePKR: money(p.originalPricePKR), originalPriceUSDT: money(p.originalPriceUSDT),
     purchaseCostBDT: money(p.purchaseCostBDT), purchaseCostPKR: money(p.purchaseCostPKR), purchaseCostUSDT: money(p.purchaseCostUSDT),
     accountCostBDT: money(p.accountCostBDT), accountCostPKR: money(p.accountCostPKR), accountCostUSDT: money(p.accountCostUSDT),
@@ -311,12 +306,12 @@ function productToBackend(p: Product) {
   return {
     title: clean(p.name, 120), slug: clean(slug, 140), description: clean(p.description, 5000), shortDescription: clean(p.shortDescription, 300), category: clean(p.category || "AI Tools", 80),
     imageUrl: clean(p.logoUrl, 1000), badge: clean(p.badge, 60), icon: clean(p.icon || "\u2728", 10),
-    priceBDT: money(p.priceBDT), pricePKR: money(p.pricePKR), priceUSDT: money(p.priceUSDT), isFree: p.isFree === true, worldwideCurrency: p.worldwideCurrency || "USDT",
+    priceBDT: 0, pricePKR: money(p.pricePKR || p.price), priceUSDT: 0, isFree: false, worldwideCurrency: "USDT" as const,
     originalPriceBDT: money(p.originalPriceBDT), originalPricePKR: money(p.originalPricePKR), originalPriceUSDT: money(p.originalPriceUSDT),
-    purchaseCostBDT: money(p.purchaseCostBDT), purchaseCostPKR: money(p.purchaseCostPKR), purchaseCostUSDT: money(p.purchaseCostUSDT),
-    accountCostBDT: money(p.accountCostBDT), accountCostPKR: money(p.accountCostPKR), accountCostUSDT: money(p.accountCostUSDT),
-    paymentGatewayFeeBDT: money(p.paymentGatewayFeeBDT), paymentGatewayFeePKR: money(p.paymentGatewayFeePKR), paymentGatewayFeeUSDT: money(p.paymentGatewayFeeUSDT),
-    otherExpenseBDT: money(p.otherExpenseBDT), otherExpensePKR: money(p.otherExpensePKR), otherExpenseUSDT: money(p.otherExpenseUSDT),
+    purchaseCostBDT: 0, purchaseCostPKR: money(p.purchaseCostPKR), purchaseCostUSDT: 0,
+    accountCostBDT: 0, accountCostPKR: 0, accountCostUSDT: 0,
+    paymentGatewayFeeBDT: 0, paymentGatewayFeePKR: 0, paymentGatewayFeeUSDT: 0,
+    otherExpenseBDT: 0, otherExpensePKR: 0, otherExpenseUSDT: 0,
     features: (p.features || []).map((feature) => clean(feature, 160)).filter(Boolean), deliveryMode: p.deliveryMode || "credentials", deliveryMethod: clean(p.deliveryMethod, 300), deliveryInstruction: clean(p.deliveryInstruction, 8000), deliveryVideoUrl: clean(p.deliveryVideoUrl, 1000), deliveryImageUrl: clean(p.deliveryImageUrl, 1000), passwordInstructionVideoUrl: clean(p.passwordInstructionVideoUrl, 1000), manualInputMode: p.manualInputMode || "ideogram_credentials", backorderStock: Math.max(0, Math.floor(money(p.backorderStock))), terms: clean(p.terms, 2000), isActive: p.isActive !== false, sortOrder: Number(p.sortOrder || 0),
   };
 }
@@ -344,8 +339,8 @@ function orderToFrontend(o: BackendOrder): Order {
   return {
     id: o.orderId || legacy.id || legacy._id || "", productId, productName: snap?.title || legacy.productName || (typeof o.productId === "object" ? o.productId.title : "") || "Product", productLogoUrl: snap?.logoUrl || legacy.productLogoUrl || "", productIcon: snap?.icon || legacy.productIcon || "✨", batchId: o.batchId || legacy.batch || "",
     customerName: o.customer?.name || legacy.customerName || "", customerEmail: o.customer?.email || legacy.customerEmail || legacy.email || "", contact: o.customer?.whatsapp || legacy.contact || legacy.whatsapp || "",
-    amount: money(snap?.price ?? legacy.amount ?? legacy.price), currency: (snap?.currency || legacy.currency || "USDT") as CurrencyCode, priceRegion: o.priceRegion || snap?.priceRegion || legacy.region,
-    paymentMethod: (o.paymentMethod || legacy.method || "binance") as Order["paymentMethod"], paymentChannel: note.channel || legacy.paymentChannel || "Manual", transactionId: o.transactionId || legacy.txid || legacy.transactionID || "", customerOrderRef: o.customerOrderRef || legacy.reference || note.ref,
+    amount: money(snap?.price ?? legacy.amount ?? legacy.price), currency: "PKR", priceRegion: "pk",
+    paymentMethod: (o.paymentMethod || "pakistan") as Order["paymentMethod"], paymentChannel: note.channel || legacy.paymentChannel || "Pakistan", transactionId: o.transactionId || legacy.txid || legacy.transactionID || "", customerOrderRef: o.customerOrderRef || legacy.reference || note.ref,
     status: normalizeOrderStatus(o.status), createdAt: o.createdAt || legacy.date || new Date().toISOString(), approvedByNickname: o.approvedByNickname || "", deliveredByNickname: o.deliveredByNickname || "", rejectedByNickname: o.rejectedByNickname || "", cancelledByNickname: o.cancelledByNickname || "", cancelledAt: o.cancelledAt || "", cancelReason: o.cancelReason || "", reviewedByNickname: o.reviewedByNickname || "", deliveryMode: snap?.deliveryMode, deliveryVideoUrl: snap?.deliveryVideoUrl || "", manualInputMode: snap?.manualInputMode || "ideogram_credentials", manualActivationRequired: snap?.deliveryMode === "manual" || Boolean(o.manualActivationRequired), manualActivationSubmitted: Boolean((o as any).manualActivationSubmittedAt || o.manualActivationSubmitted), manualActivationActivated: Boolean((o as any).manualActivationActivatedAt || o.manualActivationActivated), isBackorder: Boolean(o.fulfillment?.isBackorder || (snap as any)?.backorder), deliveryDetailsAdded: Boolean(o.fulfillment?.deliveryDetailsAddedAt),
   };
 }
@@ -377,30 +372,10 @@ function stockToDelivery(s: StockItem): DeliveryPayload {
 
 export async function getVisitorRegion(): Promise<{ region: PriceRegion; country?: string }> {
   if (isBrowser) {
-    // Old releases allowed a manual currency override. It is intentionally
-    // cleared so gateway and currency always follow the customer's IP.
     window.localStorage.removeItem("mp_region_override");
     window.sessionStorage.removeItem("mp_region_override");
-    const cached = load<{ region?: PriceRegion; country?: string; ts?: number; version?: number } | null>(STORAGE_KEYS.region, null);
-    if (cached?.region && cached.version === REGION_CACHE_VERSION && cached.ts && Date.now() - cached.ts < 1000 * 60 * 60 * 12) {
-      return { region: cached.region, country: cached.country };
-    }
   }
-
-  let country = browserCountryHint() || "XX";
-  try {
-    const detected = await detectClientCountry();
-    if (detected) country = detected;
-  } catch {}
-  let region = regionFromCountry(country);
-  try {
-    const data = await http<{ region: PriceRegion; country: string }>(`/region?region=${region}`);
-    if (data?.country && data.country !== "XX") {
-      country = data.country;
-      region = data.region;
-    }
-  } catch {}
-  const result = { region, country, ts: Date.now(), version: REGION_CACHE_VERSION };
+  const result = { region: "pk" as PriceRegion, country: "PK", ts: Date.now(), version: REGION_CACHE_VERSION };
   save(STORAGE_KEYS.region, result);
   return result;
 }
@@ -753,7 +728,7 @@ export async function fetchCustomerLatestLoginCode(orderId: string): Promise<Log
 
 export async function getPaymentSettings(): Promise<PaymentSettings> { if (IS_MOCK_MODE) return delay(load(STORAGE_KEYS.payment, mockPaymentSettings)); const data = await http<{ methods: BackendPaymentMethod[] }>("/payment-methods"); if (!data.methods.length) return mockPaymentSettings; return paymentToFrontend(data.methods); }
 export async function getAdminPaymentSettings(): Promise<PaymentSettings> { if (IS_MOCK_MODE) return delay(load(STORAGE_KEYS.payment, mockPaymentSettings)); const data = await http<{ methods: BackendPaymentMethod[] }>("/admin/payment-methods"); if (!data.methods.length) return mockPaymentSettings; return paymentToFrontend(data.methods); }
-export async function updatePaymentSettings(s: PaymentSettings): Promise<PaymentSettings> { if (IS_MOCK_MODE) { save(STORAGE_KEYS.payment, s); return delay(s); } const methods: BackendPaymentMethod[] = [ { key: "bangladesh", title: "Bangladesh", instructions: s.bangladesh.instructions, accounts: [{ label: "bKash", value: s.bangladesh.bkash, note: "Send Money" }, { label: "Nagad", value: s.bangladesh.nagad, note: "Send Money" }], isActive: true }, { key: "pakistan", title: "Pakistan", instructions: s.pakistan.instructions, accounts: [{ label: "Easypaisa", value: s.pakistan.easypaisa }, { label: "JazzCash", value: s.pakistan.jazzcash }, { label: "Bank", value: s.pakistan.bank }], isActive: true }, { key: "binance", title: "Worldwide / USDT", instructions: s.binance.instructions, accounts: [{ label: "Binance Pay ID", value: s.binance.payId }, { label: "Wallet Address", value: s.binance.wallet }], isActive: true } ]; await Promise.all(methods.map((m) => http(`/admin/payment-methods/${m.key}`, { method: "PUT", body: JSON.stringify(m) }))); return getAdminPaymentSettings(); }
+export async function updatePaymentSettings(s: PaymentSettings): Promise<PaymentSettings> { if (IS_MOCK_MODE) { save(STORAGE_KEYS.payment, s); return delay(s); } const method: BackendPaymentMethod = { key: "pakistan", title: "Pakistan", instructions: s.pakistan.instructions, accounts: [{ label: "Easypaisa", value: s.pakistan.easypaisa }, { label: "JazzCash", value: s.pakistan.jazzcash }, { label: "Bank", value: s.pakistan.bank }], isActive: true }; await http(`/admin/payment-methods/pakistan`, { method: "PUT", body: JSON.stringify(method) }); return getAdminPaymentSettings(); }
 
 export async function adminLogin(email: string, password: string): Promise<boolean> { if (IS_MOCK_MODE) { const ok = email.trim().length > 0 && password.length > 0; if (ok && isBrowser) window.localStorage.setItem(STORAGE_KEYS.admin, "1"); return delay(ok, 400); } try { const res = await http<{ token: string; admin: AdminUser }>("/admin/auth/login", { method: "POST", body: JSON.stringify({ email, password }) }); if (res?.token && isBrowser) { window.localStorage.setItem(STORAGE_KEYS.token, res.token); window.localStorage.setItem(STORAGE_KEYS.admin, "1"); save(STORAGE_KEYS.adminInfo, res.admin); return true; } return false; } catch { return false; } }
 export function getCurrentAdmin(): AdminUser | null { return load<AdminUser | null>(STORAGE_KEYS.adminInfo, null); }
@@ -766,9 +741,12 @@ export async function createAdminUser(input: { email: string; password: string; 
 export async function resetAdminPassword(id: string, password: string): Promise<AdminUser> { const data = await http<{ admin: AdminUser }>(`/admin/users/${id}/password`, { method: "PATCH", body: JSON.stringify({ password }) }); return data.admin; }
 export async function changeOwnPassword(password: string): Promise<AdminUser> { const data = await http<{ admin: AdminUser }>("/admin/users/me/password", { method: "PATCH", body: JSON.stringify({ password }) }); return data.admin; }
 export async function setAdminStatus(id: string, isActive: boolean): Promise<AdminUser> { const data = await http<{ admin: AdminUser }>(`/admin/users/${id}/status`, { method: "PATCH", body: JSON.stringify({ isActive }) }); return data.admin; }
+export async function clearAdminDue(id: string): Promise<{ settlementId: string; orderCount: number; totalSalesPKR: number; duePKR: number; profitPKR: number }> { return http(`/admin/users/${id}/due/clear`, { method: "POST" }); }
 export type DashboardPeriodMode = "weekly" | "monthly" | "lifetime" | "custom";
 export type DashboardQuery = { mode?: DashboardPeriodMode; start?: string; end?: string; month?: number; year?: number; compare?: boolean };
 export type DashboardResponse = {
+  mode?: "staff";
+  staffSummary?: { currency: "PKR"; totalSalesPKR: number; duePKR: number; profitPKR: number; orderCount: number; recentSales: Array<{ id: string; productName: string; customerName: string; customerEmail: string; status: string; approvedAt: string; sellingPrice: number; buyingPrice: number; profit: number }> };
   period?: { mode: DashboardPeriodMode; start: string | null; end: string | null; previousStart?: string | null; previousEnd?: string | null };
   stats: DashboardStats;
   kpis?: DashboardKpi[];

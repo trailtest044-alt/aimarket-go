@@ -19,7 +19,7 @@ function SupportCard({ href, title, subtitle, side }: { href: string; title: str
 export function SupportPopups() {
   return (
     <>
-      <a href={BD_WORLD_SUPPORT} target="_blank" rel="noreferrer" className="support-float support-float-left" aria-label="Bangladesh and worldwide WhatsApp support">
+      <a href={BD_WORLD_SUPPORT} target="_blank" rel="noreferrer" className="support-float support-float-left" aria-label="WhatsApp support">
         <span className="support-icon"><MessageCircle className="h-4 w-4" /></span>
         <span className="hidden sm:block"><b>{SUPPORT.bdWorld.label}</b><small>{SUPPORT.bdWorld.sub}</small></span>
       </a>

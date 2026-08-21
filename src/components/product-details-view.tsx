@@ -74,7 +74,7 @@ export function ProductDetailsView({ productId }: { productId: string }) {
               <div className="mt-6 rounded-2xl border border-border bg-white/4 p-5 text-left">
                 <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">Price</div>
                 <div className="mt-1 flex items-baseline gap-3">
-                  <span className="font-display text-3xl font-bold text-gold-gradient sm:text-4xl">{product.isFree ? "Free" : formatMoney(product.price, product.currency)}</span>
+                  <span className="font-display text-3xl font-bold text-gold-gradient sm:text-4xl">{formatMoney(product.pricePKR, "PKR")}</span>
                   {!product.isFree && product.originalPrice ? (
                     <span className="text-base text-muted-foreground/70 line-through">{formatMoney(product.originalPrice, product.currency)}</span>
                   ) : null}

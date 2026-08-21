@@ -140,6 +140,11 @@ export type AdminUser = {
   createdByNickname?: string;
   lastLoginAt?: string;
   createdAt?: string;
+  currency?: "PKR";
+  totalSalesPKR?: number;
+  duePKR?: number;
+  profitPKR?: number;
+  orderCount?: number;
 };
 
 export type DashboardStats = {

@@ -180,9 +180,9 @@ function AddModal({ products, initialProductId, onClose, onSave }: { products: P
             <>
               <Field label="Delivery email" value={email} onChange={setEmail} />
               <label className="block">
-                <span className="text-xs font-bold text-foreground">Customer &amp; reseller Get Code access (days)</span>
+                <span className="text-xs font-bold text-foreground">Customer Get Code access (days)</span>
                 <input type="number" min={1} max={3650} value={getCodeAccessDays} onChange={(event) => setGetCodeAccessDays(Math.min(3650, Math.max(1, Math.floor(Number(event.target.value) || 25))))} className="mt-1 w-full rounded-lg bg-input/70 px-3 py-2 text-sm ring-1 ring-border" required />
-                <span className="mt-1 block text-[11px] leading-4 text-muted-foreground">Count starts immediately when this stock is added. Default: 25 days. After the exact period ends, the Get Code button and server API stop for both customers and resellers.</span>
+                <span className="mt-1 block text-[11px] leading-4 text-muted-foreground">Count starts immediately when this stock is added. After the period ends, the customer Get Code button and API access stop.</span>
               </label>
               <div className="rounded-2xl border border-success/25 bg-success/8 p-4 text-xs leading-5 text-success">
                 This sends the exact email address to the customer and shows their <b>Get code</b> button. That email must already exist in <b>Mail TXT</b>; no password is needed here.

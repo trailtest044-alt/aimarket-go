@@ -14,8 +14,6 @@ import {
   priceRegionForPaymentMethod,
   validatePromoCode,
   getCurrentCustomer,
-  getResellerProfile,
-  startGoogleLogin,
   type CustomerSession,
 } from "@/lib/api";
 import { WALLETS, METHOD_CHANNELS, METHOD_META, PROMO_TEXT, CHECKOUT_TEXT, type WalletKey } from "@/lib/site-config";
@@ -31,24 +29,20 @@ import {
 import type { AppliedPromo, ManualInputMode, PaymentSettings, PriceRegion, Product } from "@/lib/mock-data";
 import {
   BadgePercent, Check, Copy, Loader2, ArrowLeft, PackageX, ShieldCheck, Sparkles, Ticket, X, Plus, Minus, Trash2,
-  LogIn, Eye, EyeOff, KeyRound, Mail, PlayCircle,
+  Eye, EyeOff, KeyRound, Mail, PlayCircle,
 } from "lucide-react";
 
 export const Route = createFileRoute("/checkout/$productId")({ component: CheckoutPage, notFoundComponent: NotFoundProduct });
-type Method = "bangladesh" | "pakistan" | "binance" | "reseller_due" | "free";
-type PaidMethod = Exclude<Method, "reseller_due" | "free">;
+type Method = "pakistan";
+type PaidMethod = "pakistan";
 
 /* Map each channel to the account number stored in admin Payment Settings */
 function channelNumber(channel: WalletKey, payment?: PaymentSettings): string {
   if (!payment) return "";
   switch (channel) {
-    case "bKash": return payment.bangladesh.bkash;
-    case "Nagad": return payment.bangladesh.nagad;
     case "Easypaisa": return payment.pakistan.easypaisa;
     case "JazzCash": return payment.pakistan.jazzcash;
     case "Bank Transfer": return payment.pakistan.bank;
-    case "Binance Pay": return payment.binance.payId;
-    default: return payment.binance.wallet;
   }
 }
 function methodInstructions(method: PaidMethod, payment?: PaymentSettings): string {
@@ -83,7 +77,7 @@ function CheckoutPage() {
   const { data: payment } = useQuery({ queryKey: ["payment"], queryFn: getPaymentSettings });
   const { data: availableProducts = [] } = useQuery({ queryKey: ["products"], queryFn: getProducts, staleTime: 60_000, refetchOnWindowFocus: false });
 
-  const [visitorRegion, setVisitorRegion] = useState<PriceRegion>("world");
+  const [visitorRegion, setVisitorRegion] = useState<PriceRegion>("pk");
   const [regionReady, setRegionReady] = useState(false);
   const [method, setMethod] = useState<Method>("pakistan");
   const [channel, setChannel] = useState<WalletKey | "">("");
@@ -101,7 +95,6 @@ function CheckoutPage() {
   const [items, setItems] = useState<Array<{ product: Product; quantity: number }>>([]);
   const [addProductOpen, setAddProductOpen] = useState(false);
   const [additionalProductId, setAdditionalProductId] = useState("");
-  const resellerQuery = useQuery({ queryKey: ["reseller-profile", customer?.email], queryFn: getResellerProfile, enabled: !!customer, retry: false });
 
   // Promo state
   const [promoInput, setPromoInput] = useState("");
@@ -123,14 +116,14 @@ function CheckoutPage() {
     getVisitorRegion()
       .then((r) => {
         if (!active) return;
-        const region = r.region || "world";
+        const region = "pk" as PriceRegion;
         setVisitorRegion(region);
         setMethod(allowedPaymentMethods(region)[0]);
         setChannel("");
       })
       .catch(() => {
         if (!active) return;
-        setVisitorRegion("world");
+        setVisitorRegion("pk");
         setMethod("pakistan");
         setChannel("");
       })
@@ -161,18 +154,11 @@ function CheckoutPage() {
     setItems((current) => current.length ? current : [{ product, quantity: 1 }]);
   }, [product]);
 
-  const reseller = resellerQuery.data;
-  const isReseller = !!reseller;
   const availableMethods = useMemo(() => allowedPaymentMethods(visitorRegion), [visitorRegion]);
   const checkoutItems = items.length ? items : (product ? [{ product, quantity: 1 }] : []);
-  const paidPriceRegion = isReseller ? visitorRegion : priceRegionForPaymentMethod(method as PaidMethod);
-  const freeCheckout = checkoutItems.length > 0 && checkoutItems.every((item) => {
-    const regionalPrice = priceForRegion(item.product, paidPriceRegion);
-    return item.product.isFree === true || Number(regionalPrice.amount || 0) <= 0;
-  });
-  const selectedPriceRegion = (isReseller || freeCheckout) ? visitorRegion : paidPriceRegion;
+  const selectedPriceRegion = priceRegionForPaymentMethod(method);
   const itemCount = checkoutItems.reduce((count, item) => count + item.quantity, 0);
-  const price = product ? priceForRegion(product, selectedPriceRegion) : { amount: 0, currency: "USDT" as const };
+  const price = product ? priceForRegion(product, selectedPriceRegion) : { amount: 0, currency: "PKR" as const };
   const subtotal = checkoutItems.reduce((sum, item) => sum + priceForRegion(item.product, selectedPriceRegion).amount * item.quantity, 0);
   const discount = itemCount === 1 && promo ? Math.min(promo.discount, subtotal) : 0;
   const total = Math.max(0, Math.round((subtotal - discount) * 100) / 100);
@@ -200,7 +186,7 @@ function CheckoutPage() {
   }
 
   const infoDone = !!(name.trim() && email.trim());
-  const payDone = freeCheckout || isReseller || !!(channel && txid.trim());
+  const payDone = !!(channel && txid.trim());
   const canSubmit = inStock && infoDone && payDone && manualDetailsDone;
 
   function requireField(target: HTMLElement | null) {
@@ -221,14 +207,7 @@ function CheckoutPage() {
         .catch(() => { setPromo(null); toast.info("Promo removed — not valid for this payment region."); });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [method, isReseller]);
-
-  useEffect(() => {
-    if (!isReseller) return;
-    setMethod("reseller_due");
-    setChannel("");
-    setTxid("");
-  }, [isReseller]);
+  }, [method]);
 
   async function applyPromo() {
     if (!product || !promoInput.trim() || promoBusy) return;
@@ -251,16 +230,11 @@ function CheckoutPage() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!product) return;
-    if (!customer) {
-      toast.info("Login with Google to safe purchase.");
-      startGoogleLogin(`/checkout/${product.id}`);
-      return;
-    }
     if (!inStock) return toast.error("This product is out of stock.");
     if (!name.trim()) return requireField(nameInputRef.current);
     if (!email.trim()) return requireField(emailInputRef.current);
-    if (!freeCheckout && !isReseller && !channel) return requireField(paymentStepRef.current);
-    if (!freeCheckout && !isReseller && !txid.trim()) return requireField(proofInputRef.current);
+    if (!channel) return requireField(paymentStepRef.current);
+    if (!txid.trim()) return requireField(proofInputRef.current);
     if (manualActivationStep && !manualLoginEmail.trim()) return toast.error("This information is required.");
     if (manualActivationStep && manualNeedsPassword && !manualLoginPassword.trim()) return toast.error("This information is required.");
     // Manual delivery gets a dedicated activation page before any order is
@@ -281,9 +255,9 @@ function CheckoutPage() {
         customerEmail: email,
         contact,
         priceRegion: selectedPriceRegion,
-        paymentMethod: freeCheckout ? "free" : (isReseller ? "reseller_due" : method),
-        paymentChannel: freeCheckout ? "Free" : (isReseller ? "Reseller due" : channel),
-        transactionId: (freeCheckout || isReseller) ? "" : txid,
+        paymentMethod: "pakistan",
+        paymentChannel: channel,
+        transactionId: txid,
         promoCode: itemCount > 1 ? "" : promo?.code || "",
         manualActivation: manualActivationStep ? { email: manualLoginEmail.trim(), password: manualNeedsPassword ? manualLoginPassword : "" } : undefined,
         clientRequestId: checkoutRequestIdRef.current,
@@ -296,9 +270,9 @@ function CheckoutPage() {
           productName: checkoutItems.map((item) => `${item.product.name}${item.quantity > 1 ? ` × ${item.quantity}` : ""}`).join(", "),
           amount: batch.totalAmount,
           currency: batch.currency,
-          method: freeCheckout ? "free" : (isReseller ? "reseller_due" : method),
-          channel: freeCheckout ? "Free" : (isReseller ? "Reseller due" : channel),
-          transactionId: (freeCheckout || isReseller) ? "" : txid,
+          method: "pakistan",
+          channel,
+          transactionId: txid,
         },
       });
     } catch (err) {
@@ -379,39 +353,6 @@ function CheckoutPage() {
     );
   }
 
-  if (!customer) {
-    return (
-      <div className="min-h-screen">
-        <SiteHeader />
-        <SupportPopups />
-        <main className="mx-auto max-w-3xl px-4 py-16 sm:px-6">
-          <Link to="/products/$id" params={{ id: product.id }} className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground">
-            <ArrowLeft className="h-4 w-4" /> Back to product
-          </Link>
-          <div className="glass animate-rise mt-6 rounded-3xl p-8 text-center">
-            <div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-primary text-primary-foreground shadow-glow">
-              <ShieldCheck className="h-8 w-8" />
-            </div>
-            <span className="eyebrow mt-6 inline-block">Safe checkout</span>
-            <h1 className="display-luxe mt-2 text-3xl font-bold">Login with Google to safe purchase</h1>
-            <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-muted-foreground">
-              Product details are public, but buying requires Google login so your purchase history,
-              delivery, and future support stay protected in your own account.
-            </p>
-            <button
-              type="button"
-              onClick={() => startGoogleLogin(`/checkout/${product.id}`)}
-              className="btn-primary mt-7 inline-flex items-center justify-center gap-2 rounded-xl px-6 py-3 text-sm font-semibold"
-            >
-              <LogIn className="h-4 w-4" /> Continue with Google
-            </button>
-          </div>
-        </main>
-        <SiteFooter />
-      </div>
-    );
-  }
-
   const wallet = channel ? WALLETS[channel] : null;
 
   return (
@@ -441,7 +382,7 @@ function CheckoutPage() {
             <Section step="1" title={CHECKOUT_TEXT.infoTitle} done={infoDone}>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Full name" value={name} onChange={setName} placeholder="Your name" inputRef={nameInputRef} invalid={showRequired && !name.trim()} />
-                <Field label="Google email" type="email" value={email} onChange={setEmail} placeholder="you@example.com" readOnly inputRef={emailInputRef} invalid={showRequired && !email.trim()} />
+                <Field label="Email" type="email" value={email} onChange={setEmail} placeholder="you@example.com" inputRef={emailInputRef} invalid={showRequired && !email.trim()} />
                 <Field className="sm:col-span-2" label="WhatsApp / Telegram (optional)" value={contact} onChange={setContact} placeholder="+8801XXXXXXXXX or @username" />
               </div>
               <p className="mt-3 text-xs text-muted-foreground">{CHECKOUT_TEXT.infoHint}</p>
@@ -449,20 +390,6 @@ function CheckoutPage() {
 
             {/* ---- STEP 2: gateway + wallet ---- */}
             <div ref={paymentStepRef}><Section step="2" title={CHECKOUT_TEXT.payTitle} done={payDone}>
-              {freeCheckout ? (
-                <div className="rounded-2xl border border-emerald-300/60 bg-emerald-50/80 p-5 text-emerald-950">
-                  <div className="flex items-center gap-2 font-bold"><Sparkles className="h-5 w-5" /> This product is free</div>
-                  <p className="mt-2 text-sm leading-6 text-emerald-900/75">No payment gateway or transaction ID is required. Submit once and available stock will be delivered automatically.</p>
-                  <div className="mt-4 rounded-xl border border-emerald-200 bg-white/80 px-4 py-3"><div className="text-xs font-semibold uppercase tracking-wider text-emerald-700">Total</div><div className="mt-1 text-2xl font-black">Free</div></div>
-                </div>
-              ) : isReseller ? (
-                <div className="rounded-2xl border border-primary/25 bg-primary/[.07] p-5">
-                  <div className="flex items-center gap-2 font-bold text-primary"><ShieldCheck className="h-5 w-5" /> Verified reseller credit order</div>
-                  <p className="mt-2 text-sm leading-6 text-muted-foreground">No payment gateway is needed. This order will be submitted as due, then an admin will approve it before delivery.</p>
-                  <div className="mt-4 grid gap-3 sm:grid-cols-2"><div className="rounded-xl bg-white/80 p-3"><div className="text-xs text-muted-foreground">This order due</div><div className="mt-1 text-lg font-black">{formatMoney(total, price.currency)}</div></div><div className="rounded-xl bg-white/80 p-3"><div className="text-xs text-muted-foreground">Current due</div><div className="mt-1 text-lg font-black">{formatMoney(Number(reseller.balances[price.currency] || 0), price.currency)}</div></div></div>
-                  <p className="mt-3 text-xs text-muted-foreground">Your reseller statement and payment history are available in My Account.</p>
-                </div>
-              ) : <>
               <p className="text-xs text-muted-foreground">{CHECKOUT_TEXT.payHint}</p>
 
               {/* Gateway tabs */}
@@ -557,7 +484,6 @@ function CheckoutPage() {
                   <p className="mt-3 text-xs text-muted-foreground">{CHECKOUT_TEXT.trackNote}</p>
                 </div>
               )}
-              </>}
             </Section></div>
 
             <SupportHelpSection title="Need help before submitting?" />
@@ -742,7 +668,7 @@ function CheckoutProcessingOverlay() {
           <Loader2 className="h-9 w-9 animate-spin" />
         </div>
         <h2 className="mt-5 text-xl font-black">Processing your order</h2>
-        <p className="mt-2 text-sm leading-6 text-muted-foreground">Please keep this page open. Your reseller order is being saved and the delivery page will open automatically.</p>
+        <p className="mt-2 text-sm leading-6 text-muted-foreground">Please keep this page open while your order is saved and the status page opens.</p>
         <div className="mt-5 rounded-xl border border-warning/20 bg-warning/10 px-4 py-3 text-xs font-bold text-warning">Do not click Submit again or refresh this page.</div>
       </div>
     </div>

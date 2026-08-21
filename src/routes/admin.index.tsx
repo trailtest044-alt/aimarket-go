@@ -46,7 +46,7 @@ import type { AttentionItem, CurrencyCode, DashboardChartRow, MoneyBag, ProductP
 
 export const Route = createFileRoute("/admin/")({ component: AdminDashboard });
 
-const currencies: CurrencyCode[] = ["PKR", "BDT", "USDT"];
+const currencies: CurrencyCode[] = ["PKR"];
 const DASHBOARD_LIVE_REFRESH_MS = 5_000;
 
 function dhakaDateInputValue(date: Date) {
@@ -87,6 +87,20 @@ function AdminDashboard() {
     revenueValue: valueFor(row.revenue, currency),
     profitValue: valueFor(row.profit, currency),
   })), [data?.chart, currency]);
+
+  if (data?.mode === "staff" && data.staffSummary) {
+    const summary = data.staffSummary;
+    return <AdminShell title="My Sales Dashboard"><div className="space-y-5">
+      <div className="grid gap-4 md:grid-cols-3">
+        <StaffMetric title="Total sales" value={summary.totalSalesPKR} />
+        <StaffMetric title="Due to owner" value={summary.duePKR} tone="warning" />
+        <StaffMetric title="Profit" value={summary.profitPKR} tone="success" />
+      </div>
+      <Panel title="Current settlement cycle" subtitle={`${summary.orderCount} approved or delivered order(s)`}>
+        <div className="overflow-x-auto"><table className="w-full text-sm"><thead className="text-left text-xs uppercase text-muted-foreground"><tr><th className="py-3">Order</th><th>Product</th><th>Customer</th><th>Selling</th><th>Buying / due</th><th>Profit</th><th>Date</th></tr></thead><tbody>{summary.recentSales.map((sale) => <tr key={sale.id} className="border-t border-border"><td className="py-3 font-semibold">{sale.id}</td><td>{sale.productName}</td><td><div>{sale.customerName}</div><div className="text-xs text-muted-foreground">{sale.customerEmail}</div></td><td>{formatMoney(sale.sellingPrice, "PKR")}</td><td>{formatMoney(sale.buyingPrice, "PKR")}</td><td className="font-semibold text-success">{formatMoney(sale.profit, "PKR")}</td><td className="text-xs text-muted-foreground">{new Date(sale.approvedAt).toLocaleString("en-PK")}</td></tr>)}</tbody></table>{summary.recentSales.length === 0 && <div className="py-12 text-center text-sm text-muted-foreground">No unsettled sales yet.</div>}</div>
+      </Panel>
+    </div></AdminShell>;
+  }
 
   return (
     <AdminShell title="Dashboard">
@@ -242,12 +256,12 @@ function AdminDashboard() {
   );
 }
 
-function valueFor(bag?: MoneyBag, currency: CurrencyCode = "BDT") {
+function valueFor(bag?: MoneyBag, currency: CurrencyCode = "PKR") {
   return Number(bag?.[currency] || 0);
 }
 
 function primaryCurrency(bag?: MoneyBag): CurrencyCode {
-  return currencies.find((code) => Number(bag?.[code] || 0) > 0) || "BDT";
+  return currencies.find((code) => Number(bag?.[code] || 0) > 0) || "PKR";
 }
 
 function formatBagPrimary(bag?: MoneyBag) {
@@ -306,6 +320,11 @@ function MetricCard({ title, icon: Icon, value, money, change, spark, tone = "pr
     </div>
   );
   return link ? <Link to={link as never}>{body}</Link> : body;
+}
+
+function StaffMetric({ title, value, tone = "primary" }: { title: string; value: number; tone?: "primary" | "warning" | "success" }) {
+  const colors = tone === "warning" ? "border-amber-200 bg-amber-50 text-amber-900" : tone === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-900" : "border-primary/20 bg-primary/5 text-foreground";
+  return <div className={`rounded-2xl border p-5 ${colors}`}><div className="text-xs font-bold uppercase tracking-wider opacity-70">{title}</div><div className="mt-2 text-3xl font-black">{formatMoney(value, "PKR")}</div></div>;
 }
 
 function MiniSpark({ values, tone }: { values: number[]; tone: string }) {

@@ -6,8 +6,8 @@ import { formatMoney } from "@/lib/api";
 
 export function ProductCard({ p }: { p: Product }) {
   const inStock = p.stock > 0;
-  const price = p.isFree ? "Free" : formatMoney(p.price, p.currency);
-  const original = !p.isFree && p.originalPrice ? formatMoney(p.originalPrice, p.currency) : "";
+  const price = formatMoney(p.pricePKR, "PKR");
+  const original = p.originalPricePKR ? formatMoney(p.originalPricePKR, "PKR") : "";
   const delivery = p.deliveryMethod?.trim();
   const warranty = p.terms?.trim();
 

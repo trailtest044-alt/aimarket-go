@@ -2,14 +2,13 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import {
   ArrowRight,
+  ClipboardList,
   Clock,
-  LogIn,
   Menu,
   MessageCircle,
   PackageOpen,
   Search,
   ShoppingBag,
-  UserCircle,
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
@@ -18,14 +17,7 @@ import { BRAND, SUPPORT } from "@/lib/brand";
 import { resolveProductLogoUrl } from "@/lib/product-logo";
 import {
   formatMoney,
-  getCurrentCustomer,
   getProducts,
-  getResellerProfile,
-  getVisitorRegion,
-  refreshCurrentCustomer,
-
-  startGoogleLogin,
-  type CustomerSession,
 } from "@/lib/api";
 import type { Product } from "@/lib/mock-data";
 
@@ -74,10 +66,6 @@ export function SiteHeader() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [activeSearchIndex, setActiveSearchIndex] = useState(0);
   const [history, setHistory] = useState<string[]>(() => getSearchHistory());
-  // Keep the server render and the browser's first hydration render identical.
-  // Reading localStorage in the state initializer made signed-in customers
-  // hydrate a different header than the one emitted by SSR.
-  const [customer, setCustomer] = useState<CustomerSession | null>(null);
   const searchQuery = debouncedSearch.trim().toLowerCase();
 
   useEffect(() => {
@@ -98,14 +86,6 @@ export function SiteHeader() {
   }, []);
 
   useEffect(() => {
-    const sync = () => setCustomer(getCurrentCustomer());
-    sync();
-    void refreshCurrentCustomer();
-    window.addEventListener("customer-auth-changed", sync);
-    return () => window.removeEventListener("customer-auth-changed", sync);
-  }, []);
-
-  useEffect(() => {
     const timer = window.setTimeout(() => {
       setDebouncedSearch(headerSearch);
       setActiveSearchIndex(0);
@@ -120,16 +100,6 @@ export function SiteHeader() {
     staleTime: 60_000,
     refetchOnWindowFocus: false,
   });
-  const { data: resellerProfile } = useQuery({
-    queryKey: ["reseller-profile", customer?.email],
-    queryFn: getResellerProfile,
-    enabled: !!customer,
-    retry: false,
-    staleTime: 60_000,
-    refetchOnWindowFocus: false,
-  });
-  const accountLabel = resellerProfile ? "Reseller" : "Account";
-
   const searchResults = useMemo(() => {
     if (searchQuery.length < 2) return [];
     return headerProducts
@@ -142,7 +112,6 @@ export function SiteHeader() {
     { to: "/", label: "Home" },
     { to: "/products", label: "Products" },
     { to: "/track-orders", label: "Track Orders" },
-    { to: "/account", label: "Account" },
   ] as const;
 
   const submitHeaderSearch = (event: FormEvent<HTMLFormElement>) => {
@@ -220,7 +189,7 @@ export function SiteHeader() {
                   <span className="block truncate text-xs text-muted-foreground">{product.category}</span>
                 </span>
                 <span className="shrink-0 text-right">
-                  <span className="block text-xs font-bold text-foreground">{product.isFree ? "Free" : formatMoney(product.price, product.currency)}</span>
+                  <span className="block text-xs font-bold text-foreground">{formatMoney(product.pricePKR, "PKR")}</span>
                   <span className={product.stock > 0 ? "text-[11px] font-semibold text-success" : "text-[11px] font-semibold text-destructive"}>
                     {product.stock > 0 ? "Available" : "Out of Stock"}
                   </span>
@@ -308,32 +277,13 @@ export function SiteHeader() {
             <Link to="/" hash="products" className="btn-primary ml-1 inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold">
               <ShoppingBag className="h-4 w-4" /> Shop now
             </Link>
-            {customer ? (
-              <Link to="/account" className="btn-ghost ml-1 inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold">
-                {customer.picture ? <img src={customer.picture} alt="" className="h-5 w-5 rounded-full" /> : <UserCircle className="h-4 w-4" />}
-                {accountLabel}
-              </Link>
-            ) : (
-              <Link to="/account" className="btn-ghost ml-1 inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold">
-                <LogIn className="h-4 w-4" /> Login
-              </Link>
-            )}
+            <Link to="/track-orders" className="btn-ghost ml-1 inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold"><ClipboardList className="h-4 w-4" /> Track orders</Link>
           </nav>
 
           <div className="flex shrink-0 items-center gap-1.5 min-[1280px]:hidden">
             <div className="hidden sm:block">
             </div>
-            {customer ? (
-              <Link to="/account" className="btn-ghost inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold">
-                {customer.picture ? <img src={customer.picture} alt="" className="h-5 w-5 rounded-full" /> : <UserCircle className="h-4 w-4" />}
-                <span className="hidden sm:inline">{accountLabel}</span>
-              </Link>
-            ) : (
-              <Link to="/account" className="btn-ghost inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold">
-                <LogIn className="h-4 w-4" />
-                <span className="hidden sm:inline">Login</span>
-              </Link>
-            )}
+            <Link to="/track-orders" className="btn-ghost inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold"><ClipboardList className="h-4 w-4" /><span className="hidden sm:inline">Track orders</span></Link>
             <button className="btn-ghost rounded-lg p-2 text-foreground md:hidden" onClick={() => setOpen((s) => !s)} aria-label="Toggle menu" aria-expanded={open}>
               {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </button>
@@ -385,20 +335,7 @@ export function SiteHeader() {
               <Link to="/" hash="products" onClick={() => setOpen(false)} className="btn-primary mt-2 inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold">
                 <ShoppingBag className="h-4 w-4" /> Shop now
               </Link>
-              {customer ? (
-                <Link to="/account" onClick={() => setOpen(false)} className="btn-ghost mt-2 inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold">
-                  <UserCircle className="h-4 w-4" /> {resellerProfile ? "Reseller account" : "My account"}
-                </Link>
-              ) : (
-                <button
-                  onClick={() => {
-                    setOpen(false);
-                    startGoogleLogin("/account");
-                  }}
-                  className="btn-ghost mt-2 inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold"
-                >
-                  <LogIn className="h-4 w-4" /> Continue with Google
-                </button>              )}
+              <Link to="/track-orders" onClick={() => setOpen(false)} className="btn-ghost mt-2 inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold"><ClipboardList className="h-4 w-4" /> Track orders</Link>
             </div>
           </div>
         )}
@@ -418,7 +355,7 @@ export function SiteFooter() {
               {BRAND.tagline} Verified premium AI subscriptions and digital products — hand-checked, delivered fast, backed by real support.
             </p>
             <div className="mt-5 flex flex-wrap gap-2">
-              {["bKash", "Nagad", "Binance Pay", "USDT"].map((p) => (
+              {["Easypaisa", "JazzCash", "Bank Transfer", "PKR"].map((p) => (
                 <span key={p} className="rounded-full border border-border bg-white/4 px-3 py-1 text-[11px] font-semibold text-muted-foreground">
                   {p}
                 </span>

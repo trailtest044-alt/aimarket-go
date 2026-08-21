@@ -30,23 +30,14 @@ function PaymentSettingsPage() {
 
   return (
     <AdminShell title="Payment Settings">
-      <div className="grid gap-6 lg:grid-cols-3">
-        <Section title="🇧🇩 Bangladesh">
-          <F label="bKash" value={form.bangladesh.bkash} onChange={(v) => setForm({ ...form, bangladesh: { ...form.bangladesh, bkash: v } })} />
-          <F label="Nagad" value={form.bangladesh.nagad} onChange={(v) => setForm({ ...form, bangladesh: { ...form.bangladesh, nagad: v } })} />
-          <TA label="Instructions" value={form.bangladesh.instructions} onChange={(v) => setForm({ ...form, bangladesh: { ...form.bangladesh, instructions: v } })} />
-        </Section>
+      <div className="grid gap-6 lg:grid-cols-2">
         <Section title="🇵🇰 Pakistan">
           <F label="Easypaisa" value={form.pakistan.easypaisa} onChange={(v) => setForm({ ...form, pakistan: { ...form.pakistan, easypaisa: v } })} />
           <F label="JazzCash" value={form.pakistan.jazzcash} onChange={(v) => setForm({ ...form, pakistan: { ...form.pakistan, jazzcash: v } })} />
           <F label="Bank" value={form.pakistan.bank} onChange={(v) => setForm({ ...form, pakistan: { ...form.pakistan, bank: v } })} />
           <TA label="Instructions" value={form.pakistan.instructions} onChange={(v) => setForm({ ...form, pakistan: { ...form.pakistan, instructions: v } })} />
         </Section>
-        <Section title="🟡 Binance / Crypto">
-          <F label="Binance Pay ID" value={form.binance.payId} onChange={(v) => setForm({ ...form, binance: { ...form.binance, payId: v } })} />
-          <F label="Wallet Address" value={form.binance.wallet} onChange={(v) => setForm({ ...form, binance: { ...form.binance, wallet: v } })} />
-          <TA label="Instructions" value={form.binance.instructions} onChange={(v) => setForm({ ...form, binance: { ...form.binance, instructions: v } })} />
-        </Section>
+        <div className="glass rounded-2xl p-5 text-sm text-muted-foreground">All customer payments use PKR. Only the Pakistan gateways configured here are available at checkout.</div>
       </div>
       <div className="mt-6 flex justify-end">
         <button onClick={save} className="inline-flex items-center gap-2 rounded-xl bg-gradient-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-glow">
