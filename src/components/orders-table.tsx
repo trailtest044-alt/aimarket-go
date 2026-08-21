@@ -58,8 +58,9 @@ export function OrdersTable({ status }: { status?: Order["status"] }) {
     if (details.type === "manual" && !details.instruction.trim()) return toast.error("Enter the delivery instruction.");
     setDetailsBusy(true);
     try {
-      await addOrderDeliveryDetails(detailsOrder.id, { ...details, adminNote: `Added for ${detailsOrder.id}` });
-      await qc.invalidateQueries({ queryKey: ["orders"] });
+      const updated = await addOrderDeliveryDetails(detailsOrder.id, { ...details, adminNote: `Added for ${detailsOrder.id}` });
+      qc.setQueryData<Order[]>(["orders"], (current) => current?.map((order) => order.id === updated.id ? updated : order));
+      await qc.refetchQueries({ queryKey: ["orders"], type: "active" });
       toast.success("Delivery details added. Approve and deliver are unlocked.");
       setDetailsOrder(null);
     } catch (error) { toast.error(error instanceof Error ? error.message : "Could not add delivery details."); }
