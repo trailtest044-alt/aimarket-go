@@ -6,6 +6,8 @@ export type ManualInputMode = "ideogram_credentials" | "email_password" | "email
 export type Product = {
   id: string;
   backendId?: string;
+  supplierProductId?: string;
+  supplierPackageId?: string;
   name: string;
   category: string;
   price: number;
@@ -89,6 +91,9 @@ export type MailTxtFile = {
 export type Order = {
   id: string;
   productId: string;
+  supplierProductId?: string;
+  supplierPackageId?: string;
+  supplierStatus?: string;
   productName: string;
   productLogoUrl?: string;
   productIcon?: string;

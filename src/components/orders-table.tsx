@@ -113,7 +113,7 @@ export function OrdersTable({ status }: { status?: Order["status"] }) {
               <td>
                 <div className="flex min-w-40 items-center gap-2">
                   <ProductLogo logoUrl={o.productLogoUrl} icon={o.productIcon || "✨"} name={o.productName} className="h-8 w-8 shrink-0 rounded-lg border border-border bg-white/5" emojiClassName="text-base" />
-                  <div><div className="font-medium">{o.productName}</div>{o.batchId && <div className="font-mono text-[10px] text-muted-foreground">{o.batchId}</div>}</div>
+                  <div className="min-w-0"><div className="font-medium">{o.productName}</div><div className="font-mono text-[10px] text-muted-foreground">Local ID: {o.productId || "—"}</div>{o.supplierProductId && <div className="font-mono text-[10px] text-emerald-700">Plandaw ID: {o.supplierProductId}{o.supplierPackageId ? ` / ${o.supplierPackageId}` : ""}</div>}{o.supplierStatus && <div className="text-[10px] font-semibold capitalize text-muted-foreground">Supplier: {o.supplierStatus.replaceAll("_", " ")}</div>}{o.batchId && <div className="font-mono text-[10px] text-muted-foreground">{o.batchId}</div>}</div>
                 </div>
               </td>
               <td>

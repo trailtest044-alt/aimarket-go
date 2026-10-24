@@ -58,6 +58,8 @@ const STORAGE_KEYS = {
 };
 
 const isBrowser = typeof window !== "undefined";
+export async function getSupplierSync() { return http<{ configured: boolean; state: null | { lastSuccessAt?: string; nextAttemptAt?: string; failures: number; lastError: string; imported: number } }>('/admin/supplier-sync'); }
+export async function retrySupplierSync() { return http<{ ok?: boolean; busy?: boolean; configured?: boolean; error?: string }>('/admin/supplier-sync/retry', { method: 'POST', body: '{}' }); }
 const objectIdRe = /^[a-f\d]{24}$/i;
 const REGION_CACHE_VERSION = 9;
 const PRODUCT_DEDUPE_MS = 30_000;
@@ -147,7 +149,7 @@ export async function trackAnonymousVisit(path: string): Promise<void> {
 
 type BackendProduct = {
   _id: string; title: string; slug: string; description?: string; shortDescription?: string; category?: string; imageUrl?: string;
-  badge?: string; icon?: string; priceBDT?: number; pricePKR?: number; priceUSDT?: number; isFree?: boolean; worldwideCurrency?: "USDT" | "USD";
+  badge?: string; icon?: string; supplierProductId?: string; supplierPackageId?: string; priceBDT?: number; pricePKR?: number; priceUSDT?: number; isFree?: boolean; worldwideCurrency?: "USDT" | "USD";
   originalPriceBDT?: number; originalPricePKR?: number; originalPriceUSDT?: number; features?: string[];
   purchaseCostBDT?: number; purchaseCostPKR?: number; purchaseCostUSDT?: number;
   accountCostBDT?: number; accountCostPKR?: number; accountCostUSDT?: number;
@@ -167,6 +169,7 @@ type BackendOrder = {
   paymentMethod: "bangladesh" | "pakistan" | "binance" | "reseller_due" | "free"; priceRegion?: PriceRegion; transactionId?: string; paymentNote?: string; customerOrderRef?: string; batchId?: string;
   status: Order["status"]; createdAt?: string; reviewedAt?: string; rejectReason?: string | null; cancelReason?: string | null; cancelledAt?: string; deliveryAvailable?: boolean; manualActivationRequired?: boolean; manualActivationSubmitted?: boolean; manualActivationActivated?: boolean; fulfillment?: { isBackorder?: boolean; deliveryDetailsAddedAt?: string | null };
   approvedByNickname?: string; deliveredByNickname?: string; rejectedByNickname?: string; cancelledByNickname?: string; reviewedByNickname?: string;
+  supplier?: { provider?: string; productId?: string; packageId?: string; status?: string; lastError?: string };
 };
 type BackendStock = { _id: string; productId?: string | { _id?: string; title?: string; slug?: string }; status: "available" | "reserved" | "delivered" | "disabled" | "cancelled"; adminNote?: string; createdAt?: string; payload?: { deliveryMode?: DeliveryMode; email?: string; password?: string; activationCode?: string; instruction?: string; videoUrl?: string; imageUrl?: string; getCodeAccessDays?: number }; createdByNickname?: string; };
 type BackendMailTxtFile = Omit<MailTxtFile, "id"> & { _id?: string; id?: string };
@@ -264,6 +267,8 @@ function productToFrontend(p: BackendProduct): Product {
   return {
     id: p.slug || p._id,
     backendId: p._id,
+    supplierProductId: p.supplierProductId || "",
+    supplierPackageId: p.supplierPackageId || "",
     name: p.title,
     category: p.category || "AI Tools",
     price: pricePKR,
@@ -306,7 +311,7 @@ function productToBackend(p: Product) {
   const clean = (value: unknown, max: number) => String(value || "").trim().slice(0, max);
   return {
     title: clean(p.name, 120), slug: clean(slug, 140), description: clean(p.description, 5000), shortDescription: clean(p.shortDescription, 300), category: clean(p.category || "AI Tools", 80),
-    imageUrl: clean(p.logoUrl, 1000), badge: clean(p.badge, 60), icon: clean(p.icon || "\u2728", 10),
+    imageUrl: clean(p.logoUrl, 1000), badge: clean(p.badge, 60), icon: clean(p.icon || "\u2728", 10), supplierProductId: clean(p.supplierProductId, 80), supplierPackageId: clean(p.supplierPackageId, 80),
     priceBDT: 0, pricePKR: money(p.pricePKR || p.price), priceUSDT: 0, isFree: false, worldwideCurrency: "USDT" as const,
     originalPriceBDT: money(p.originalPriceBDT), originalPricePKR: money(p.originalPricePKR), originalPriceUSDT: money(p.originalPriceUSDT),
     purchaseCostBDT: 0, purchaseCostPKR: money(p.purchaseCostPKR), purchaseCostUSDT: 0,
@@ -338,7 +343,7 @@ function orderToFrontend(o: BackendOrder): Order {
   const legacy = o as BackendOrder & Record<string, any>;
   const note = parsePaymentNote(o.paymentNote); const snap = o.productSnapshot || o.product || legacy.productDetails; const productId = typeof o.productId === "object" ? (o.productId.slug || o.productId._id || "") : (o.productId || legacy.productSlug || "");
   return {
-    id: o.orderId || legacy.id || legacy._id || "", productId, productName: snap?.title || legacy.productName || (typeof o.productId === "object" ? o.productId.title : "") || "Product", productLogoUrl: snap?.logoUrl || legacy.productLogoUrl || "", productIcon: snap?.icon || legacy.productIcon || "✨", batchId: o.batchId || legacy.batch || "",
+    id: o.orderId || legacy.id || legacy._id || "", productId, supplierProductId: o.supplier?.productId || "", supplierPackageId: o.supplier?.packageId || "", supplierStatus: o.supplier?.status || "", productName: snap?.title || legacy.productName || (typeof o.productId === "object" ? o.productId.title : "") || "Product", productLogoUrl: snap?.logoUrl || legacy.productLogoUrl || "", productIcon: snap?.icon || legacy.productIcon || "✨", batchId: o.batchId || legacy.batch || "",
     customerName: o.customer?.name || legacy.customerName || "", customerEmail: o.customer?.email || legacy.customerEmail || legacy.email || "", contact: o.customer?.whatsapp || legacy.contact || legacy.whatsapp || "",
     amount: money(snap?.price ?? legacy.amount ?? legacy.price), currency: "PKR", priceRegion: "pk",
     paymentMethod: (o.paymentMethod || "pakistan") as Order["paymentMethod"], paymentChannel: note.channel || legacy.paymentChannel || "Pakistan", transactionId: o.transactionId || legacy.txid || legacy.transactionID || "", customerOrderRef: o.customerOrderRef || legacy.reference || note.ref,

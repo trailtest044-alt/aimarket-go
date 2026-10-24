@@ -40,6 +40,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { AdminShell } from "@/components/admin-shell";
+import { SupplierSyncPanel } from '@/components/supplier-sync-panel';
 import { formatMoney, getDashboard, type DashboardPeriodMode } from "@/lib/api";
 import { useAdminAuthReady } from "@/hooks/use-admin-auth-ready";
 import type { AttentionItem, CurrencyCode, DashboardChartRow, MoneyBag, ProductPerformanceRow, TopCustomerRow } from "@/lib/mock-data";
@@ -104,6 +105,7 @@ function AdminDashboard() {
 
   return (
     <AdminShell title="Dashboard">
+      <SupplierSyncPanel />
       <div className="space-y-5">
         <div className="rounded-[1.15rem] border border-[#e6e2f1] bg-white/85 p-4 shadow-[0_18px_55px_rgba(80,64,140,0.08)] backdrop-blur">
           <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">

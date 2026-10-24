@@ -16,6 +16,7 @@ import { reportLovableError } from "../lib/lovable-error-reporting";
 import { BRAND } from "../lib/brand";
 import { BrandMark } from "../components/brand-logo";
 import { CursorGlow } from "../components/cursor-glow";
+import { DeliveryAlertCenter } from "../components/delivery-alert-center";
 import { trackAnonymousVisit } from "../lib/api";
 
 const siteStructuredData = JSON.stringify({
@@ -136,6 +137,7 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <VisitorTracker pathname={pathname} />
+      <DeliveryAlertCenter />
       <Outlet />
       <CursorGlow />
       <Toaster theme="light" position="top-right" richColors />

@@ -334,6 +334,11 @@ function EditModal({ product, existing, onClose, onSave }: { product: Product; e
           <Input label="Name" value={p.name} onChange={(v) => setP({ ...p, name: v })} />
           <Input label="Category" value={p.category} onChange={(v) => setP({ ...p, category: v })} />
           <Input label="Display Order" type="number" value={String(p.sortOrder || "")} onChange={(v) => setP({ ...p, sortOrder: parseFloat(v) || 0 })} />
+          <div className="sm:col-span-2 grid gap-3 rounded-2xl border border-emerald-300/60 bg-emerald-50/70 p-3 sm:grid-cols-2">
+            <Input label="Plandaw Product ID" value={p.supplierProductId || ""} onChange={(v) => setP({ ...p, supplierProductId: v.trim() })} />
+            <Input label="Plandaw Package ID (optional)" value={p.supplierPackageId || ""} onChange={(v) => setP({ ...p, supplierPackageId: v.trim() })} />
+            <p className="sm:col-span-2 text-xs leading-5 text-emerald-900">Copy the exact stable ID from Plandaw Partner API. When set, Pakistan orders reserve and receive stock from Plandaw; never match by product name.</p>
+          </div>
           <div className="sm:col-span-2 rounded-2xl border border-border bg-secondary/20 p-3">
             <Input label="Product Logo / Image URL" value={p.logoUrl ?? ""} onChange={(v) => setP({ ...p, logoUrl: v || undefined })} />
             <div className="mt-3 text-xs font-semibold text-muted-foreground">Quick reusable logos</div>
