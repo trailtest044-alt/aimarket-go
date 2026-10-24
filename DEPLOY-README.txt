@@ -6,7 +6,8 @@ Do not upload the outer ZIP folder as a subfolder.
 Vercel settings:
 - Root Directory: leave blank (.)
 - Framework Preset: TanStack Start
-- Build Command: bun run build (or leave the detected default)
+- Install Command: npm install (or leave the detected default)
+- Build Command: npm run build (or leave the detected default)
 - Output Directory: leave blank
 - Node.js: 20 or newer
 
